@@ -98,6 +98,44 @@ export interface Database {
           created_at?: string
         }
       }
+      exercise_record_history: {
+        Row: {
+          id: string
+          user_id: string
+          exercise_id: string
+          workout_session_id: string | null
+          weight: number | null
+          reps: number | null
+          duration: number | null
+          achieved_at: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          exercise_id: string
+          workout_session_id?: string | null
+          weight?: number | null
+          reps?: number | null
+          duration?: number | null
+          achieved_at?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          exercise_id?: string
+          workout_session_id?: string | null
+          weight?: number | null
+          reps?: number | null
+          duration?: number | null
+          achieved_at?: string
+          notes?: string | null
+          created_at?: string
+        }
+      }
       workout_sets: {
         Row: {
           id: string
@@ -272,6 +310,7 @@ export interface Database {
 export type User = Database['public']['Tables']['users']['Row']
 export type Exercise = Database['public']['Tables']['exercises']['Row']
 export type ExerciseRecord = Database['public']['Tables']['exercise_records']['Row']
+export type ExerciseRecordHistory = Database['public']['Tables']['exercise_record_history']['Row']
 export type WorkoutSet = Database['public']['Tables']['workout_sets']['Row']
 export type WorkoutSetExercise = Database['public']['Tables']['workout_set_exercises']['Row']
 export type WorkoutSession = Database['public']['Tables']['workout_sessions']['Row']
@@ -282,6 +321,7 @@ export type WorkoutSetData = Database['public']['Tables']['workout_sets_data']['
 export type UserInsert = Database['public']['Tables']['users']['Insert']
 export type ExerciseInsert = Database['public']['Tables']['exercises']['Insert']
 export type ExerciseRecordInsert = Database['public']['Tables']['exercise_records']['Insert']
+export type ExerciseRecordHistoryInsert = Database['public']['Tables']['exercise_record_history']['Insert']
 export type WorkoutSetInsert = Database['public']['Tables']['workout_sets']['Insert']
 export type WorkoutSetExerciseInsert = Database['public']['Tables']['workout_set_exercises']['Insert']
 export type WorkoutSessionInsert = Database['public']['Tables']['workout_sessions']['Insert']
@@ -292,6 +332,7 @@ export type WorkoutSetDataInsert = Database['public']['Tables']['workout_sets_da
 export type UserUpdate = Database['public']['Tables']['users']['Update']
 export type ExerciseUpdate = Database['public']['Tables']['exercises']['Update']
 export type ExerciseRecordUpdate = Database['public']['Tables']['exercise_records']['Update']
+export type ExerciseRecordHistoryUpdate = Database['public']['Tables']['exercise_record_history']['Update']
 export type WorkoutSetUpdate = Database['public']['Tables']['workout_sets']['Update']
 export type WorkoutSetExerciseUpdate = Database['public']['Tables']['workout_set_exercises']['Update']
 export type WorkoutSessionUpdate = Database['public']['Tables']['workout_sessions']['Update']

@@ -14,6 +14,7 @@ import type {
   SaveSetData,
   WorkoutHistoryFilters,
   ExerciseRecordUpdate,
+  ExerciseRecordInsert,
 } from '@/lib/types/database'
 
 // ============================================
@@ -116,14 +117,19 @@ export async function updateExerciseRecord(
   record: ExerciseRecordUpdate
 ) {
   const supabase = createClient()
+  
+  const upsertData: ExerciseRecordInsert = {
+    user_id: userId,
+    exercise_id: exerciseId,
+    max_weight: record.max_weight,
+    max_reps: record.max_reps,
+    max_duration: record.max_duration,
+    last_updated: new Date().toISOString(),
+  }
+  
   const { data, error } = await supabase
     .from('exercise_records')
-    .upsert({
-      user_id: userId,
-      exercise_id: exerciseId,
-      ...record,
-      last_updated: new Date().toISOString(),
-    })
+    .upsert(upsertData)
     .select()
     .single()
 
@@ -522,5 +528,114 @@ export async function markWarmupCompleted(workoutSessionExerciseId: string) {
 
   if (error) throw error
   return data
+}
+
+// ============================================
+// ИСТОРИЯ ЛИЧНЫХ РЕКОРДОВ (Exercise Record History)
+// ============================================
+
+/**
+ * Добавить запись в историю рекордов
+ */
+export async function addRecordToHistory(
+  userId: string,
+  exerciseId: string,
+  data: {
+    weight?: number | null
+    reps?: number | null
+    duration?: number | null
+    workout_session_id?: string | null
+    notes?: string | null
+  }
+) {
+  const supabase = createClient()
+  const { data: record, error } = await supabase
+    .from('exercise_record_history')
+    .insert({
+      user_id: userId,
+      exercise_id: exerciseId,
+      weight: data.weight,
+      reps: data.reps,
+      duration: data.duration,
+      workout_session_id: data.workout_session_id,
+      notes: data.notes,
+      achieved_at: new Date().toISOString(),
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return record
+}
+
+/**
+ * Получить историю рекордов по упражнению
+ */
+export async function getExerciseRecordHistory(
+  userId: string,
+  exerciseId: string,
+  limit = 50
+) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('exercise_record_history')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('exercise_id', exerciseId)
+    .order('achieved_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Получить все рекорды за период
+ */
+export async function getRecordHistoryByDateRange(
+  userId: string,
+  dateFrom: string,
+  dateTo: string
+) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('exercise_record_history')
+    .select(`
+      *,
+      exercise:exercises(name, tags)
+    `)
+    .eq('user_id', userId)
+    .gte('achieved_at', dateFrom)
+    .lte('achieved_at', dateTo)
+    .order('achieved_at', { ascending: false })
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Получить данные для графика прогресса
+ */
+export async function getProgressChartData(
+  userId: string,
+  exerciseId: string,
+  metric: 'weight' | 'reps' | 'duration'
+) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('exercise_record_history')
+    .select('achieved_at, weight, reps, duration')
+    .eq('user_id', userId)
+    .eq('exercise_id', exerciseId)
+    .not(metric, 'is', null)
+    .order('achieved_at', { ascending: true })
+
+  if (error) throw error
+  
+  // Форматируем данные для графика
+  return data?.map(record => ({
+    date: new Date(record.achieved_at).toLocaleDateString(),
+    value: record[metric],
+  })) || []
 }
 
