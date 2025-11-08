@@ -164,10 +164,10 @@ export default function WorkoutSession() {
 
           <div className="flex-1"></div>
 
-          <div className="fixed bottom-[10px] left-0 right-0 flex justify-center z-50">
-            <div className="w-full max-w-md px-[10px]">
+          <div className="fixed bottom-[10px] left-0 right-0 flex justify-center pointer-events-none z-50">
+            <div className="w-full max-w-md px-[10px] pointer-events-auto relative">
               <div
-                className="absolute inset-x-0 bottom-0 h-[250px] -z-10"
+                className="absolute inset-x-0 bottom-0 h-[250px] -z-10 pointer-events-none"
                 style={{
                   backdropFilter: "blur(20px)",
                   WebkitBackdropFilter: "blur(20px)",
@@ -295,9 +295,9 @@ export default function WorkoutSession() {
           <div className="flex-1"></div>
 
           <div className="fixed bottom-[10px] left-0 right-0 flex justify-center pointer-events-none z-50">
-            <div className="w-full max-w-md px-[10px] pointer-events-auto">
+            <div className="w-full max-w-md px-[10px] pointer-events-auto relative">
               <div
-                className="absolute inset-x-0 bottom-0 h-[250px] -z-10"
+                className="absolute inset-x-0 bottom-0 h-[250px] -z-10 pointer-events-none"
                 style={{
                   backdropFilter: "blur(20px)",
                   WebkitBackdropFilter: "blur(20px)",
