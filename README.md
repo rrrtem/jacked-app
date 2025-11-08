@@ -19,13 +19,29 @@ pnpm install
 
 ### 2. Настройка Supabase
 
+#### Создание проекта и базы данных
+
 1. Создайте проект на [Supabase](https://app.supabase.com)
-2. Скопируйте `.env.local` и заполните переменные:
-   - `NEXT_PUBLIC_SUPABASE_URL` — URL вашего проекта
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Anon/Public ключ
-   - `SUPABASE_SERVICE_ROLE_KEY` — Service Role ключ (для серверных операций)
+2. Перейдите в **SQL Editor** и выполните скрипт из файла `supabase_schema.sql`
+   - Это создаст все необходимые таблицы, индексы и политики безопасности
+3. Проверьте в **Table Editor**, что создались 8 таблиц:
+   - `users`, `exercises`, `exercise_records`
+   - `workout_sets`, `workout_set_exercises`
+   - `workout_sessions`, `workout_session_exercises`, `workout_sets_data`
+
+#### Настройка переменных окружения
+
+Создайте файл `.env.local` в корне проекта:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...ваш_anon_ключ
+SUPABASE_SERVICE_ROLE_KEY=eyJ...ваш_service_role_ключ
+```
 
 Найти эти значения можно в: **Project Settings → API**
+
+📖 **Подробная инструкция**: см. файл `SUPABASE_SETUP.md`
 
 ### 3. Запуск dev-сервера
 
@@ -34,6 +50,28 @@ pnpm dev
 ```
 
 Откройте [http://localhost:3000](http://localhost:3000) в браузере.
+
+### 4. Публичный туннель через ngrok
+
+1. Установите ngrok (однократно):
+
+   ```bash
+   brew install ngrok/ngrok/ngrok
+   ```
+
+2. Авторизуйтесь в ngrok, подставив свой токен с [dashboard.ngrok.com](https://dashboard.ngrok.com/get-started/your-authtoken):
+
+   ```bash
+   ngrok config add-authtoken <ваш_authtoken>
+   ```
+
+3. После запуска dev-сервера поднимите туннель:
+
+   ```bash
+   ngrok http 3000
+   ```
+
+   В ответе появится публичный `https://...ngrok-free.dev` адрес, который можно открыть на телефоне. Пока консоль с `pnpm dev` и `ngrok` не закрыты, адрес будет раздавать актуальное состояние приложения.
 
 ## Структура проекта
 
@@ -89,8 +127,82 @@ vercel
 
 Подробнее в [brief.md](./brief.md)
 
+## Структура проекта
+
+```
+/app                    # Next.js App Router
+  /exercise/[id]        # Детали упражнения
+  /workout/[id]         # Активная тренировка
+  /history/[date]       # История по дате
+  /start               # Выбор тренировки
+  page.tsx             # Главная (календарь)
+
+/lib                    # Библиотеки и утилиты
+  /supabase            # Клиенты Supabase
+    client.ts          # Браузерный клиент
+    server.ts          # Серверный клиент
+    queries.ts         # Готовые запросы к БД
+  /types               # TypeScript типы
+    database.ts        # Типы БД
+  /state               # State machines
+    workoutMachine.ts  # Логика тренировки
+  /utils               # Утилиты
+    cn.ts              # className helper
+    time.ts            # Работа со временем
+
+/server                # Серверная логика
+  /actions             # Server Actions
+  /routers             # API Routes
+```
+
+## База данных
+
+### Таблицы
+
+1. **users** — профили пользователей
+2. **exercises** — каталог упражнений с тегами
+3. **exercise_records** — личные рекорды (вес, повторы, время)
+4. **workout_sets** — шаблоны тренировок
+5. **workout_set_exercises** — упражнения в шаблонах
+6. **workout_sessions** — история тренировок
+7. **workout_session_exercises** — упражнения в сессии
+8. **workout_sets_data** — данные подходов (вес, повторы)
+
+### Файлы БД
+
+- `supabase_schema.sql` — SQL для создания таблиц
+- `DATABASE_SCHEMA.md` — подробное описание схемы
+- `SUPABASE_SETUP.md` — пошаговая инструкция настройки
+- `lib/types/database.ts` — TypeScript типы
+- `lib/supabase/queries.ts` — готовые функции для работы с БД
+
+### Примеры использования
+
+```typescript
+import { getAllExercises, createWorkoutSession } from '@/lib/supabase/queries'
+
+// Получить все упражнения
+const exercises = await getAllExercises()
+
+// Создать тренировку
+const session = await createWorkoutSession(userId, {
+  exercises: [
+    { exercise_id: 'xxx', order_index: 0 },
+    { exercise_id: 'yyy', order_index: 1 },
+  ]
+})
+```
+
 ## Документация
 
 - [Next.js](https://nextjs.org/docs)
 - [Supabase](https://supabase.com/docs)
 - [Tailwind CSS](https://tailwindcss.com/docs)
+
+## Быстрый пуш в GitHub
+
+Для коммита и отправки всех текущих изменений одной командой подставьте своё сообщение вместо `"<message>"`:
+
+```bash
+git add . && git commit -m "<message>" && git push origin main
+```

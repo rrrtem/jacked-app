@@ -4,21 +4,23 @@ import Link from "next/link"
 import { Settings } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 
-function generateContinuousDates(monthsToShow: number) {
+function generateContinuousDates(monthsToShow: number, extraWeeksAfterToday = 2) {
   const today = new Date()
   const currentYear = today.getFullYear()
   const currentMonth = today.getMonth()
   const currentDate = today.getDate()
 
   const allDates = []
+  let lastActualDate: Date | null = null
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  const workoutDates = [3, 5, 7, 10, 13, 15, 18, 21, 24, 27, 29]
 
   for (let i = monthsToShow - 1; i >= 0; i--) {
     const monthDate = new Date(currentYear, currentMonth - i, 1)
     const year = monthDate.getFullYear()
     const month = monthDate.getMonth()
     const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-    const workoutDates = [3, 5, 7, 10, 13, 15, 18, 21, 24, 27, 29]
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateObj = new Date(year, month, day)
@@ -27,8 +29,6 @@ function generateContinuousDates(monthsToShow: number) {
       const isFuture = dateObj > today
       const hasWorkout = workoutDates.includes(day) && (isPast || isToday)
       const isFirstOfMonth = day === 1
-
-      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
       allDates.push({
         date: day,
@@ -39,6 +39,8 @@ function generateContinuousDates(monthsToShow: number) {
         monthAbbr: monthNames[month],
         fullDate: `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
       })
+
+      lastActualDate = dateObj
     }
   }
 
@@ -50,30 +52,101 @@ function generateContinuousDates(monthsToShow: number) {
     allDates.unshift({ date: null, isEmpty: true })
   }
 
+  const todayIndex = allDates.findIndex((d: any) => d.today)
+
+  if (todayIndex !== -1 && lastActualDate) {
+    const todayRow = Math.floor(todayIndex / 7)
+    let totalRows = Math.ceil(allDates.length / 7)
+    let rowsAfterToday = totalRows - todayRow - 1
+    const missingRows = Math.max(0, extraWeeksAfterToday - rowsAfterToday)
+
+    if (missingRows > 0) {
+      const daysToAdd = missingRows * 7
+
+      for (let i = 1; i <= daysToAdd; i++) {
+        const futureDate = new Date(lastActualDate)
+        futureDate.setDate(futureDate.getDate() + i)
+
+        const year = futureDate.getFullYear()
+        const month = futureDate.getMonth()
+        const day = futureDate.getDate()
+
+        const isToday = year === currentYear && month === currentMonth && day === currentDate
+        const isPast = futureDate < today
+        const isFuture = futureDate > today
+        const hasWorkout = workoutDates.includes(day) && (isPast || isToday)
+        const isFirstOfMonth = day === 1
+
+        allDates.push({
+          date: day,
+          active: hasWorkout,
+          today: isToday,
+          isFuture,
+          isFirstOfMonth,
+          monthAbbr: monthNames[month],
+          fullDate: `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        })
+      }
+
+      if (lastActualDate) {
+        lastActualDate.setDate(lastActualDate.getDate() + missingRows * 7)
+      }
+
+      totalRows = Math.ceil(allDates.length / 7)
+      rowsAfterToday = totalRows - todayRow - 1
+    }
+
+    const maxRows = todayRow + 1 + extraWeeksAfterToday
+    const maxCells = maxRows * 7
+
+    if (allDates.length > maxCells) {
+      allDates.splice(maxCells)
+    }
+  }
+
   return allDates
 }
 
 export default function WorkoutTracker() {
   const [calendarDates, setCalendarDates] = useState<any[]>([])
+  const [calendarHeight, setCalendarHeight] = useState<number | null>(null)
   const calendarRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const dates = generateContinuousDates(12)
     setCalendarDates(dates)
-
-    setTimeout(() => {
-      if (calendarRef.current) {
-        const todayIndex = dates.findIndex((d: any) => d.today)
-        if (todayIndex !== -1) {
-          const cellWidth = calendarRef.current.offsetWidth / 7
-          const cellHeight = cellWidth
-          const todayRow = Math.floor(todayIndex / 7)
-          const targetRow = Math.max(0, todayRow - 3)
-          calendarRef.current.scrollTop = targetRow * cellHeight
-        }
-      }
-    }, 100)
   }, [])
+
+  useEffect(() => {
+    const updateHeight = () => {
+      if (!calendarRef.current) return
+      const cell = calendarRef.current.querySelector<HTMLElement>("[data-calendar-cell='true']")
+      if (!cell) return
+
+      const cellHeight = cell.getBoundingClientRect().height
+      if (!cellHeight) return
+
+      const adjustedHeight = Math.floor(cellHeight * 5)
+      setCalendarHeight(adjustedHeight)
+    }
+
+    updateHeight()
+    window.addEventListener("resize", updateHeight)
+
+    return () => {
+      window.removeEventListener("resize", updateHeight)
+    }
+  }, [calendarDates])
+
+  useEffect(() => {
+    if (calendarRef.current && calendarDates.length) {
+      requestAnimationFrame(() => {
+        if (calendarRef.current) {
+          calendarRef.current.scrollTop = calendarRef.current.scrollHeight
+        }
+      })
+    }
+  }, [calendarDates])
 
   const daysOfWeek = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
@@ -110,7 +183,8 @@ export default function WorkoutTracker() {
 
           <div
             ref={calendarRef}
-            className="h-[calc(5*14.28571%*100vw/7)] max-h-[calc(5*60px)] overflow-y-auto pr-2 scrollbar-thin"
+            className="overflow-y-auto pr-2 scrollbar-thin"
+            style={calendarHeight !== null ? { height: calendarHeight } : undefined}
           >
             <div className="grid grid-cols-7 gap-0">
               {calendarDates.map((item: any, index: number) => {
@@ -133,6 +207,7 @@ export default function WorkoutTracker() {
                       ${item.active && !item.today ? "hover:bg-[#a8d5ff]" : "hover:bg-[#f7f7f7]"}
                       cursor-pointer
                     `}
+                    data-calendar-cell="true"
                   >
                     {item.isFirstOfMonth && <span className="text-[10px] leading-[100%] mb-1">{item.monthAbbr}</span>}
                     <span>{item.date}</span>
