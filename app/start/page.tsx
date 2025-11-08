@@ -6,11 +6,24 @@ import { useState, useRef } from "react"
 import Link from "next/link"
 import { X, Mic, Trash2 } from "lucide-react"
 
+type Exercise = {
+  id: number
+  name: string
+  sets: number | null
+  warmupTime?: string
+}
+
+type Preset = {
+  id: string
+  label: string
+  exercises: Exercise[]
+}
+
 export default function StartWorkout() {
   const [showAdjustOverlay, setShowAdjustOverlay] = useState(false)
   const [inputText, setInputText] = useState("")
   const [activePreset, setActivePreset] = useState("d1")
-  const [presets, setPresets] = useState([
+  const [presets, setPresets] = useState<Preset[]>([
     {
       id: "d1",
       label: "d1",
