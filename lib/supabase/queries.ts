@@ -118,18 +118,18 @@ export async function updateExerciseRecord(
 ) {
   const supabase = createClient()
   
-  const upsertData = {
+  const upsertData: ExerciseRecordInsert = {
     user_id: userId,
     exercise_id: exerciseId,
     max_weight: record.max_weight ?? null,
     max_reps: record.max_reps ?? null,
     max_duration: record.max_duration ?? null,
     last_updated: new Date().toISOString(),
-  } satisfies ExerciseRecordInsert
+  }
   
   const { data, error } = await supabase
     .from('exercise_records')
-    .upsert(upsertData)
+    .upsert(upsertData, { onConflict: 'user_id,exercise_id' })
     .select()
     .single()
 
