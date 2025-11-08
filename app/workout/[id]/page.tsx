@@ -65,17 +65,18 @@ export default function WorkoutSession() {
   const ensureInputVisible = (input: HTMLInputElement | null) => {
     if (!input) return
 
-    const prefersCenteredScroll =
-      typeof window !== "undefined" &&
-      typeof window.visualViewport !== "undefined" &&
-      window.visualViewport?.height < window.innerHeight
+    const visualViewport = typeof window !== "undefined" ? window.visualViewport : undefined
+
+    const prefersCenteredScroll = Boolean(
+      visualViewport && typeof visualViewport.height === "number" && visualViewport.height < window.innerHeight,
+    )
 
     input.scrollIntoView({
       block: prefersCenteredScroll ? "center" : "nearest",
       behavior: "smooth",
     })
 
-    if (typeof window !== "undefined" && window.visualViewport) {
+    if (visualViewport) {
       const handleViewportChange = () => {
         input.scrollIntoView({
           block: "center",
@@ -83,7 +84,7 @@ export default function WorkoutSession() {
         })
       }
 
-      window.visualViewport.addEventListener("resize", handleViewportChange, { once: true })
+      visualViewport.addEventListener("resize", handleViewportChange, { once: true })
     }
   }
 
