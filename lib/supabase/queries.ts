@@ -129,7 +129,7 @@ export async function updateExerciseRecord(
   
   const { data, error } = await supabase
     .from('exercise_records')
-    .upsert(upsertData, { onConflict: 'user_id,exercise_id' })
+    .upsert(upsertData as any, { onConflict: 'user_id,exercise_id' })
     .select()
     .single()
 
