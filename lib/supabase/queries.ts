@@ -80,9 +80,10 @@ export async function getExercisesWithRecords(
     `)
     .eq('exercise_records.user_id', userId)
     .order('name')
+    .returns<ExerciseWithRecords[]>()
 
   if (error) throw error
-  return data || []
+  return data ?? []
 }
 
 // ============================================
@@ -195,12 +196,14 @@ export async function getWorkoutSetWithExercises(
 
   if (error) throw error
   
+  const workoutSet = data as unknown as WorkoutSetWithExercises | null
+  
   // Сортируем упражнения по order_index
-  if (data?.exercises) {
-    data.exercises.sort((a, b) => a.order_index - b.order_index)
+  if (workoutSet?.exercises) {
+    workoutSet.exercises.sort((a, b) => a.order_index - b.order_index)
   }
   
-  return data
+  return workoutSet
 }
 
 /**
@@ -323,17 +326,19 @@ export async function getActiveWorkoutSession(
 
   if (error && error.code !== 'PGRST116') throw error
   
+  const session = data as unknown as WorkoutSessionWithDetails | null
+  
   // Сортируем упражнения и подходы
-  if (data?.exercises) {
-    data.exercises.sort((a, b) => a.order_index - b.order_index)
-    data.exercises.forEach((ex) => {
+  if (session?.exercises) {
+    session.exercises.sort((a, b) => a.order_index - b.order_index)
+    session.exercises.forEach((ex) => {
       if (ex.sets) {
         ex.sets.sort((a, b) => a.set_number - b.set_number)
       }
     })
   }
   
-  return data
+  return session
 }
 
 /**
@@ -446,17 +451,19 @@ export async function getWorkoutSessionById(
 
   if (error) throw error
   
+  const session = data as unknown as WorkoutSessionWithDetails | null
+  
   // Сортируем упражнения и подходы
-  if (data?.exercises) {
-    data.exercises.sort((a, b) => a.order_index - b.order_index)
-    data.exercises.forEach((ex) => {
+  if (session?.exercises) {
+    session.exercises.sort((a, b) => a.order_index - b.order_index)
+    session.exercises.forEach((ex) => {
       if (ex.sets) {
         ex.sets.sort((a, b) => a.set_number - b.set_number)
       }
     })
   }
   
-  return data
+  return session
 }
 
 /**

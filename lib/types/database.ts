@@ -39,6 +39,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       exercises: {
         Row: {
@@ -65,6 +66,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       exercise_records: {
         Row: {
@@ -97,6 +99,7 @@ export interface Database {
           last_updated?: string
           created_at?: string
         }
+        Relationships: []
       }
       exercise_record_history: {
         Row: {
@@ -135,6 +138,7 @@ export interface Database {
           notes?: string | null
           created_at?: string
         }
+        Relationships: []
       }
       workout_sets: {
         Row: {
@@ -161,6 +165,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       workout_set_exercises: {
         Row: {
@@ -196,6 +201,7 @@ export interface Database {
           rest_duration?: number | null
           created_at?: string
         }
+        Relationships: []
       }
       workout_sessions: {
         Row: {
@@ -231,6 +237,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       workout_session_exercises: {
         Row: {
@@ -257,6 +264,7 @@ export interface Database {
           warmup_completed?: boolean | null
           created_at?: string
         }
+        Relationships: []
       }
       workout_sets_data: {
         Row: {
@@ -292,6 +300,7 @@ export interface Database {
           notes?: string | null
           created_at?: string
         }
+        Relationships: []
       }
     }
     Views: {
@@ -301,6 +310,9 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
       [_ in never]: never
     }
   }
