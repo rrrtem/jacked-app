@@ -118,14 +118,14 @@ export async function updateExerciseRecord(
 ) {
   const supabase = createClient()
   
-  const upsertData: ExerciseRecordInsert = {
+  const upsertData = {
     user_id: userId,
     exercise_id: exerciseId,
-    max_weight: record.max_weight,
-    max_reps: record.max_reps,
-    max_duration: record.max_duration,
+    max_weight: record.max_weight ?? null,
+    max_reps: record.max_reps ?? null,
+    max_duration: record.max_duration ?? null,
     last_updated: new Date().toISOString(),
-  }
+  } satisfies ExerciseRecordInsert
   
   const { data, error } = await supabase
     .from('exercise_records')
