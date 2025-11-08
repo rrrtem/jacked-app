@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, ChangeEvent } from "react"
+import { useState, useEffect, ChangeEvent, useRef, FocusEvent } from "react"
 import Link from "next/link"
 
 type WorkoutStage = "warmup" | "exercise-warmup" | "working-set" | "rest" | "finished"
@@ -18,6 +18,10 @@ export default function WorkoutSession() {
   const [reps, setReps] = useState("10")
   const [isEditingWeight, setIsEditingWeight] = useState(false)
   const [isEditingReps, setIsEditingReps] = useState(false)
+
+  const weightInputRef = useRef<HTMLInputElement | null>(null)
+  const repsInputRef = useRef<HTMLInputElement | null>(null)
+  const lastScrollYRef = useRef(0)
 
   useEffect(() => {
     if (!isWorkoutActive) return
@@ -58,6 +62,52 @@ export default function WorkoutSession() {
       const cleanedValue = event.target.value.replace(/\D/g, "")
       setter(cleanedValue)
     }
+
+  const focusEditableInput = (input: HTMLInputElement | null) => {
+    if (!input) return
+    lastScrollYRef.current = window.scrollY
+
+    try {
+      input.focus({ preventScroll: true })
+    } catch {
+      input.focus()
+    }
+
+    requestAnimationFrame(() => {
+      input.select()
+    })
+  }
+
+  useEffect(() => {
+    if (isEditingWeight) {
+      focusEditableInput(weightInputRef.current)
+    }
+  }, [isEditingWeight])
+
+  useEffect(() => {
+    if (isEditingReps) {
+      focusEditableInput(repsInputRef.current)
+    }
+  }, [isEditingReps])
+
+  const handleInputFocus = (event: FocusEvent<HTMLInputElement>) => {
+    lastScrollYRef.current = window.scrollY
+
+    requestAnimationFrame(() => {
+      event.target.select()
+    })
+  }
+
+  const handleInputBlur = (setter: (value: boolean) => void) => () => {
+    setter(false)
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: lastScrollYRef.current,
+        behavior: "smooth",
+      })
+    }, 150)
+  }
 
   const exercises = [
     {
@@ -182,8 +232,9 @@ export default function WorkoutSession() {
                     type="text"
                     value={weight}
                     onChange={handleNumericInput(setWeight)}
-                    onBlur={() => setIsEditingWeight(false)}
-                    autoFocus
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur(setIsEditingWeight)}
+                    ref={weightInputRef}
                     inputMode="numeric"
                     pattern="[0-9]*"
                     className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none text-center"
@@ -202,8 +253,9 @@ export default function WorkoutSession() {
                     type="text"
                     value={reps}
                     onChange={handleNumericInput(setReps)}
-                    onBlur={() => setIsEditingReps(false)}
-                    autoFocus
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur(setIsEditingReps)}
+                    ref={repsInputRef}
                     inputMode="numeric"
                     pattern="[0-9]*"
                     className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none text-center"
@@ -312,8 +364,9 @@ export default function WorkoutSession() {
                     type="text"
                     value={weight}
                     onChange={handleNumericInput(setWeight)}
-                    onBlur={() => setIsEditingWeight(false)}
-                    autoFocus
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur(setIsEditingWeight)}
+                    ref={weightInputRef}
                     inputMode="numeric"
                     pattern="[0-9]*"
                     className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none text-center"
@@ -332,8 +385,9 @@ export default function WorkoutSession() {
                     type="text"
                     value={reps}
                     onChange={handleNumericInput(setReps)}
-                    onBlur={() => setIsEditingReps(false)}
-                    autoFocus
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur(setIsEditingReps)}
+                    ref={repsInputRef}
                     inputMode="numeric"
                     pattern="[0-9]*"
                     className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none text-center"
