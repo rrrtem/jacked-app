@@ -63,6 +63,20 @@ export default function WorkoutSession() {
       setter(cleanedValue)
     }
 
+  const ensureInputVisible = (input: HTMLInputElement | null) => {
+    if (!input) return
+
+    const prefersCenteredScroll =
+      typeof window !== "undefined" &&
+      typeof window.visualViewport !== "undefined" &&
+      window.visualViewport?.height < window.innerHeight
+
+    input.scrollIntoView({
+      block: prefersCenteredScroll ? "center" : "nearest",
+      behavior: "smooth",
+    })
+  }
+
   const focusEditableInput = (input: HTMLInputElement | null) => {
     if (!input) return
     lastScrollYRef.current = window.scrollY
@@ -76,6 +90,10 @@ export default function WorkoutSession() {
     requestAnimationFrame(() => {
       input.select()
     })
+
+    window.setTimeout(() => {
+      ensureInputVisible(input)
+    }, 50)
   }
 
   useEffect(() => {
@@ -96,6 +114,10 @@ export default function WorkoutSession() {
     requestAnimationFrame(() => {
       event.target.select()
     })
+
+    window.setTimeout(() => {
+      ensureInputVisible(event.target)
+    }, 50)
   }
 
   const handleInputBlur = (setter: (value: boolean) => void) => () => {
