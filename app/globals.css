@@ -1,26 +1,74 @@
 @import "tailwindcss";
 
+/* Дизайн-система Jacked */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Цвета */
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-accent: #ff2f00;
+  --color-secondary: #cfe9ff;
+  
+  /* Типографика */
+  --font-body: 20px;
+  --font-text-chat: 16px;
+  --font-h1: 32px;
+  --font-supertitle: 60px;
+  
+  --line-height-normal: 120%;
+  --line-height-tight: 110%;
+  
+  /* Радиусы */
+  --radius-card: 20px;
+  --radius-button: 60px;
+  
+  /* Отступы */
+  --spacing-base: 10px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--color-white);
+  --color-foreground: var(--color-black);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-white);
+  color: var(--color-black);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: var(--font-body);
+  line-height: var(--line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Типографика */
+h1 {
+  font-size: var(--font-h1);
+  line-height: var(--line-height-normal);
+  font-weight: 400;
+}
+
+.text-body {
+  font-size: var(--font-body);
+  line-height: var(--line-height-normal);
+}
+
+.text-chat {
+  font-size: var(--font-text-chat);
+  line-height: var(--line-height-normal);
+}
+
+.text-supertitle {
+  font-size: var(--font-supertitle);
+  line-height: var(--line-height-tight);
+}
+
+/* Утилиты */
+.opacity-inactive {
+  opacity: 0.3;
 }

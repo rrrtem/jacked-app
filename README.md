@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jacked — Персональный дневник тренировок
 
-## Getting Started
+Приложение для отслеживания тренировок с адаптивными сетапами, аналитикой прогресса и AI-помощником.
 
-First, run the development server:
+## Стек технологий
+
+- **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS
+- **Backend**: Supabase (PostgreSQL, Auth, Storage, Edge Functions)
+- **Деплой**: Vercel
+- **Пакетный менеджер**: pnpm
+
+## Быстрый старт
+
+### 1. Установка зависимостей
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Настройка Supabase
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Создайте проект на [Supabase](https://app.supabase.com)
+2. Скопируйте `.env.local` и заполните переменные:
+   - `NEXT_PUBLIC_SUPABASE_URL` — URL вашего проекта
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Anon/Public ключ
+   - `SUPABASE_SERVICE_ROLE_KEY` — Service Role ключ (для серверных операций)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Найти эти значения можно в: **Project Settings → API**
 
-## Learn More
+### 3. Запуск dev-сервера
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+pnpm dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Откройте [http://localhost:3000](http://localhost:3000) в браузере.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Структура проекта
 
-## Deploy on Vercel
+```
+/app
+  /(auth)/          # Страницы авторизации (login, signup)
+  /(dashboard)/     # Защищённые страницы приложения
+    page.tsx        # Дашборд (календарь + achievements)
+    start/          # Выбор workout set
+    [workoutId]/    # Активная тренировка
+    history/        # История тренировок
+    settings/       # Настройки
+    exercises/      # Библиотека упражнений
+/components         # UI компоненты (Button, Card, Input)
+/features           # Фичи (calendar, workout-flow, ai-chat)
+/lib                # Утилиты, Supabase клиенты, state machine
+/server             # Server actions, API роуты
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Скрипты
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `pnpm dev` — запуск dev-сервера
+- `pnpm build` — сборка для продакшена
+- `pnpm start` — запуск продакшен-сборки
+- `pnpm lint` — проверка ESLint
+- `pnpm format` — форматирование кода (Prettier)
+- `pnpm type-check` — проверка типов TypeScript
+
+## Деплой на Vercel
+
+### Через GitHub
+
+1. Запушьте код в GitHub репозиторий
+2. Импортируйте проект на [Vercel](https://vercel.com/new)
+3. Добавьте переменные окружения в настройках проекта:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+4. Vercel автоматически задеплоит приложение
+
+### Через CLI
+
+```bash
+pnpm install -g vercel
+vercel
+```
+
+## Дизайн-система
+
+- **Цвета**: `#FFFFFF` (фон), `#000000` (текст), `#FF2F00` (акцент), `#CFE9FF` (вторичный)
+- **Типографика**: Suisse Int'l, размеры 16/20/32/60px
+- **Радиусы**: 20px (карточки), 60px (кнопки)
+
+Подробнее в [brief.md](./brief.md)
+
+## Документация
+
+- [Next.js](https://nextjs.org/docs)
+- [Supabase](https://supabase.com/docs)
+- [Tailwind CSS](https://tailwindcss.com/docs)
