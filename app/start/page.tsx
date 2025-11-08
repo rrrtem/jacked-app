@@ -128,7 +128,7 @@ export default function StartWorkout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#ffffff] flex items-center justify-center p-[10px] relative">
+    <div className="min-h-screen bg-[#ffffff] flex justify-center p-[10px] relative">
       <div className="w-full max-w-md relative">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
