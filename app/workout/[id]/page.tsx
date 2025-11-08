@@ -21,7 +21,6 @@ export default function WorkoutSession() {
 
   const weightInputRef = useRef<HTMLInputElement | null>(null)
   const repsInputRef = useRef<HTMLInputElement | null>(null)
-  const lastScrollYRef = useRef(0)
 
   useEffect(() => {
     if (!isWorkoutActive) return
@@ -75,11 +74,21 @@ export default function WorkoutSession() {
       block: prefersCenteredScroll ? "center" : "nearest",
       behavior: "smooth",
     })
+
+    if (typeof window !== "undefined" && window.visualViewport) {
+      const handleViewportChange = () => {
+        input.scrollIntoView({
+          block: "center",
+          behavior: "smooth",
+        })
+      }
+
+      window.visualViewport.addEventListener("resize", handleViewportChange, { once: true })
+    }
   }
 
   const focusEditableInput = (input: HTMLInputElement | null) => {
     if (!input) return
-    lastScrollYRef.current = window.scrollY
 
     try {
       input.focus({ preventScroll: true })
@@ -109,8 +118,6 @@ export default function WorkoutSession() {
   }, [isEditingReps])
 
   const handleInputFocus = (event: FocusEvent<HTMLInputElement>) => {
-    lastScrollYRef.current = window.scrollY
-
     requestAnimationFrame(() => {
       event.target.select()
     })
@@ -122,13 +129,6 @@ export default function WorkoutSession() {
 
   const handleInputBlur = (setter: (value: boolean) => void) => () => {
     setter(false)
-
-    setTimeout(() => {
-      window.scrollTo({
-        top: lastScrollYRef.current,
-        behavior: "smooth",
-      })
-    }, 150)
   }
 
   const exercises = [
