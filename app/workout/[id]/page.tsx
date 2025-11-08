@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, ChangeEvent } from "react"
 import Link from "next/link"
 
 type WorkoutStage = "warmup" | "exercise-warmup" | "working-set" | "rest" | "finished"
@@ -53,6 +53,12 @@ export default function WorkoutSession() {
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
+  const handleNumericInput =
+    (setter: (value: string) => void) => (event: ChangeEvent<HTMLInputElement>) => {
+      const cleanedValue = event.target.value.replace(/\D/g, "")
+      setter(cleanedValue)
+    }
+
   const exercises = [
     {
       name: "warm up",
@@ -103,8 +109,8 @@ export default function WorkoutSession() {
 
           <div className="flex-1"></div>
 
-          <div className="fixed bottom-[10px] left-0 right-0 flex justify-center pointer-events-none z-50">
-            <div className="w-full max-w-md px-[10px] pointer-events-auto">
+          <div className="fixed bottom-[10px] left-0 right-0 flex justify-center z-50">
+            <div className="w-full max-w-md px-[10px]">
               <div
                 className="absolute inset-x-0 bottom-0 h-[200px] -z-10"
                 style={{
@@ -158,8 +164,8 @@ export default function WorkoutSession() {
 
           <div className="flex-1"></div>
 
-          <div className="fixed bottom-[10px] left-0 right-0 flex justify-center pointer-events-none z-50">
-            <div className="w-full max-w-md px-[10px] pointer-events-auto">
+          <div className="fixed bottom-[10px] left-0 right-0 flex justify-center z-50">
+            <div className="w-full max-w-md px-[10px]">
               <div
                 className="absolute inset-x-0 bottom-0 h-[250px] -z-10"
                 style={{
@@ -175,10 +181,12 @@ export default function WorkoutSession() {
                   <input
                     type="text"
                     value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
+                    onChange={handleNumericInput(setWeight)}
                     onBlur={() => setIsEditingWeight(false)}
                     autoFocus
-                    className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none text-center"
                   />
                 ) : (
                   <button
@@ -193,10 +201,12 @@ export default function WorkoutSession() {
                   <input
                     type="text"
                     value={reps}
-                    onChange={(e) => setReps(e.target.value)}
+                    onChange={handleNumericInput(setReps)}
                     onBlur={() => setIsEditingReps(false)}
                     autoFocus
-                    className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none text-center"
                   />
                 ) : (
                   <button
@@ -248,10 +258,12 @@ export default function WorkoutSession() {
             </button>
           </div>
 
-          <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="mb-8">
             <h1 className="text-[60px] leading-[110%] font-normal text-[#ffffff]">rest</h1>
             <p className="text-[60px] leading-[110%] font-normal text-[#ff2f00]">{formatTime(restTime)}</p>
           </div>
+
+          <div className="flex-1"></div>
         </div>
       </div>
     )
@@ -299,10 +311,12 @@ export default function WorkoutSession() {
                   <input
                     type="text"
                     value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
+                    onChange={handleNumericInput(setWeight)}
                     onBlur={() => setIsEditingWeight(false)}
                     autoFocus
-                    className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none text-center"
                   />
                 ) : (
                   <button
@@ -317,10 +331,12 @@ export default function WorkoutSession() {
                   <input
                     type="text"
                     value={reps}
-                    onChange={(e) => setReps(e.target.value)}
+                    onChange={handleNumericInput(setReps)}
                     onBlur={() => setIsEditingReps(false)}
                     autoFocus
-                    className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="w-full bg-[#ffffff] text-[#000000] py-5 px-6 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] outline-none text-center"
                   />
                 ) : (
                   <button
