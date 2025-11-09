@@ -5,10 +5,13 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { calculateSetSuggestion } from "@/lib/progression"
+import { getExerciseRecord } from "@/lib/supabase/queries"
+import type { SetSuggestion } from "@/lib/types/progression"
 
 type SupabaseClientType = ReturnType<typeof createClient>
 
-type WorkoutStage = "warmup" | "exercise-warmup" | "working-set" | "rest" | "finished"
+type WorkoutStage = "warmup" | "exercise-warmup" | "working-set" | "rest" | "add-exercise-prompt" | "finished"
 
 type ExerciseData = {
   id: string
@@ -82,6 +85,10 @@ export default function WorkoutSession() {
   const [isEditingReps, setIsEditingReps] = useState(false)
   const [isEditingDuration, setIsEditingDuration] = useState(false)
   const [isWarmupShuffleLoading, setIsWarmupShuffleLoading] = useState(false)
+  const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false)
+  const [availableExercises, setAvailableExercises] = useState<DbExercise[]>([])
+  const [isLoadingExercises, setIsLoadingExercises] = useState(false)
+  const [showExerciseList, setShowExerciseList] = useState(false)
   
   // История выполненных подходов: { exerciseId: [{ set: 1, weight: "30", reps: "10" }, ...] }
   const [completedSets, setCompletedSets] = useState<Record<string, CompletedSet[]>>({})
@@ -106,6 +113,64 @@ export default function WorkoutSession() {
   const hasTag = (exercise: ExerciseData | null | undefined, tag: string) => {
     if (!exercise?.tags || exercise.tags.length === 0) return false
     return exercise.tags.includes(tag)
+  }
+
+  /**
+   * Загрузить suggestion для текущего упражнения и подхода
+   */
+  const loadSuggestionForCurrentSet = async (
+    exercise: ExerciseData,
+    setNumber: number
+  ) => {
+    if (isLoadingSuggestion) return
+    
+    try {
+      setIsLoadingSuggestion(true)
+      
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.user) {
+        console.log('No user session, using default values')
+        return
+      }
+
+      const exerciseId = exercise.exerciseId || exercise.id
+      const exerciseTags = Array.isArray(exercise.tags) ? exercise.tags : []
+      
+      // Получаем рекорд пользователя
+      let record = null
+      try {
+        record = await getExerciseRecord(session.user.id, exerciseId)
+      } catch (error) {
+        console.log('No record found for exercise:', exerciseId)
+      }
+
+      // Рассчитываем suggestion
+      const suggestion: SetSuggestion = calculateSetSuggestion({
+        exerciseId,
+        exerciseTags,
+        setNumber,
+        record,
+      })
+
+      // Применяем suggestion к инпутам
+      if (suggestion.weight !== undefined) {
+        setWeight(String(suggestion.weight))
+      }
+      if (suggestion.reps !== undefined) {
+        setReps(String(suggestion.reps))
+      }
+      if (suggestion.duration !== undefined) {
+        setDuration(String(suggestion.duration))
+      }
+
+      console.log(`Suggestion for set ${setNumber}:`, suggestion)
+    } catch (error) {
+      console.error('Error loading suggestion:', error)
+    } finally {
+      setIsLoadingSuggestion(false)
+    }
   }
 
   const pickRandomWarmup = (pool: ExerciseData[], excludeId?: string) => {
@@ -163,6 +228,46 @@ export default function WorkoutSession() {
     } finally {
       setIsWarmupShuffleLoading(false)
     }
+  }
+
+  const fetchAllExercises = async () => {
+    if (isLoadingExercises) return
+    
+    setIsLoadingExercises(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("exercises")
+        .select("id, name, instructions, tags")
+        .order("name")
+
+      if (error) throw error
+
+      setAvailableExercises(data || [])
+      setShowExerciseList(true)
+    } catch (error) {
+      console.error("Error loading exercises:", error)
+    } finally {
+      setIsLoadingExercises(false)
+    }
+  }
+
+  const addExerciseToWorkout = (exercise: DbExercise) => {
+    const newExercise: ExerciseData = {
+      id: exercise.id,
+      exerciseId: exercise.id,
+      workoutEntryId: null,
+      name: exercise.name,
+      sets: null,
+      instructions: exercise.instructions || undefined,
+      tags: Array.isArray(exercise.tags) ? exercise.tags : [],
+    }
+
+    setExercises([...exercises, newExercise])
+    setCurrentExercise(exercises.length)
+    setCurrentSet(1)
+    setShowExerciseList(false)
+    setStage("exercise-warmup")
   }
 
   // Загружаем сохраненное состояние после монтирования (избегаем hydration mismatch)
@@ -307,6 +412,8 @@ export default function WorkoutSession() {
         setDuration(savedState.duration || "30")
         setCompletedSets(savedState.completedSets || {})
         setStartTime(savedState.startTime || Date.now())
+        setShowExerciseList(savedState.showExerciseList || false)
+        setAvailableExercises(savedState.availableExercises || [])
       } else {
         // Новая тренировка
         setWarmupTime(getInitialWarmupTime())
@@ -337,9 +444,11 @@ export default function WorkoutSession() {
       completedSets,
       exercises,
       startTime,
+      showExerciseList,
+      availableExercises,
     }
     localStorage.setItem("workoutState", JSON.stringify(workoutState))
-  }, [isMounted, stage, currentExercise, currentSet, totalTime, warmupTime, restTime, isWorkoutActive, weight, reps, duration, completedSets, exercises, startTime])
+  }, [isMounted, stage, currentExercise, currentSet, totalTime, warmupTime, restTime, isWorkoutActive, weight, reps, duration, completedSets, exercises, startTime, showExerciseList, availableExercises])
 
   useEffect(() => {
     if (!isWorkoutActive) return
@@ -485,6 +594,20 @@ export default function WorkoutSession() {
     }
   }, [currentExercise, exercises, isEditingWeight, isEditingReps, isEditingDuration])
 
+  // Загружаем suggestions при смене упражнения или подхода
+  useEffect(() => {
+    const exercise = exercises[currentExercise]
+    if (!exercise) return
+    
+    // Загружаем suggestion только когда находимся на стадии упражнения
+    if (stage === "exercise-warmup" || stage === "working-set") {
+      loadSuggestionForCurrentSet(exercise, currentSet)
+    }
+  }, [currentExercise, currentSet, stage, exercises])
+
+  // Статистика для общего веса за все время
+  const [totalLifetimeWeight, setTotalLifetimeWeight] = useState<number | null>(null)
+  
   // Загружаем статистику при переходе на финальный экран
   useEffect(() => {
     if (stage !== "finished" || !isMounted) return
@@ -495,14 +618,17 @@ export default function WorkoutSession() {
         const { data: { session } } = await supabase.auth.getSession()
         
         if (session?.user) {
-          // Получаем количество завершенных тренировок
-          const { count } = await supabase
-            .from("workout_sessions")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", session.user.id)
-            .not("completed_at", "is", null)
+          // Получаем статистику пользователя из таблицы users
+          const { data: userData } = await supabase
+            .from("users")
+            .select("total_workouts, total_weight_lifted")
+            .eq("id", session.user.id)
+            .single()
 
-          setTotalWorkouts(count || 0)
+          if (userData) {
+            setTotalWorkouts(userData.total_workouts || 0)
+            setTotalLifetimeWeight(userData.total_weight_lifted || 0)
+          }
         }
 
         // Подсчитываем вес текущей тренировки
@@ -769,8 +895,8 @@ export default function WorkoutSession() {
                   setCurrentSet(1)
                   setStage("exercise-warmup")
                 } else {
-                  // Если это последнее упражнение, завершаем тренировку
-                  finishWorkout()
+                  // Если это последнее упражнение, показываем экран добавления упражнения
+                  setStage("add-exercise-prompt")
                 }
               }}
               className="w-[64px] h-[64px] rounded-full bg-[#000000] text-[#ffffff] flex items-center justify-center hover:opacity-90"
@@ -782,6 +908,31 @@ export default function WorkoutSession() {
         </div>
       </div>
     )
+  }
+
+  // Функция для перезагрузки статистики после сохранения
+  const reloadUserStats = async () => {
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session?.user) {
+        // Получаем обновленную статистику пользователя из таблицы users
+        const { data: userData } = await supabase
+          .from("users")
+          .select("total_workouts, total_weight_lifted")
+          .eq("id", session.user.id)
+          .single()
+
+        if (userData) {
+          setTotalWorkouts(userData.total_workouts || 0)
+          setTotalLifetimeWeight(userData.total_weight_lifted || 0)
+          console.log("Stats reloaded:", userData)
+        }
+      }
+    } catch (error) {
+      console.error("Error reloading stats:", error)
+    }
   }
 
   // Функция сохранения тренировки в БД
@@ -796,8 +947,8 @@ export default function WorkoutSession() {
         return
       }
 
-      // Подсчитываем статистику
-      const totalWeight = Object.values(completedSets).reduce((total, sets) => {
+      // Подсчитываем общий объем (вес × повторы для всех подходов)
+      const totalVolume = Object.values(completedSets).reduce((total, sets) => {
         return total + sets.reduce((sum, set) => {
           const w = set.weight ? parseFloat(set.weight) || 0 : 0
           const r = set.reps ? parseInt(set.reps, 10) || 0 : 0
@@ -813,12 +964,24 @@ export default function WorkoutSession() {
           started_at: new Date(startTime).toISOString(),
           completed_at: new Date().toISOString(),
           duration: totalTime,
-          notes: `Total weight lifted: ${totalWeight.toFixed(0)} kg`,
+          total_volume: totalVolume,
+          notes: `Total volume: ${totalVolume.toFixed(0)} kg`,
         })
         .select()
         .single()
 
       if (sessionError) throw sessionError
+
+      // Подготавливаем данные для обновления рекордов
+      const exerciseSetsForRecords: {
+        exerciseId: string
+        exerciseTags: string[]
+        sets: {
+          weight?: number | null
+          reps?: number | null
+          duration?: number | null
+        }[]
+      }[] = []
 
       // Добавляем упражнения и их подходы
       for (let i = 0; i < exercises.length; i++) {
@@ -867,9 +1030,49 @@ export default function WorkoutSession() {
           .insert(setsData)
 
         if (setsError) throw setsError
+
+        // Добавляем данные для обновления рекордов
+        exerciseSetsForRecords.push({
+          exerciseId: exerciseIdForDb,
+          exerciseTags: exercise.tags || [],
+          sets: setsData.map(s => ({
+            weight: s.weight,
+            reps: s.reps,
+            duration: s.duration,
+          }))
+        })
       }
 
-      console.log("Workout saved successfully!")
+      // Обновляем личные рекорды
+      try {
+        const { updateRecordsFromWorkout } = await import("@/lib/supabase/queries")
+        const newRecords = await updateRecordsFromWorkout(
+          session.user.id,
+          workoutSession.id,
+          exerciseSetsForRecords
+        )
+        
+        if (newRecords.length > 0) {
+          console.log("New records set:", newRecords)
+        }
+      } catch (recordError) {
+        console.error("Error updating records:", recordError)
+        // Не прерываем выполнение, даже если не удалось обновить рекорды
+      }
+
+      // Обновляем статистику пользователя (total_workouts и total_weight_lifted)
+      try {
+        const { updateUserStatsAfterWorkout } = await import("@/lib/supabase/queries")
+        const updatedStats = await updateUserStatsAfterWorkout(session.user.id, totalVolume)
+        console.log("User stats updated:", updatedStats)
+        
+        // Перезагружаем статистику на UI
+        await reloadUserStats()
+      } catch (statsError) {
+        console.error("Error updating user stats:", statsError)
+      }
+
+      console.log("Workout saved successfully! Total volume:", totalVolume.toFixed(0), "kg")
     } catch (error) {
       console.error("Error saving workout:", error)
     }
@@ -1117,6 +1320,111 @@ export default function WorkoutSession() {
     )
   }
 
+  // Add Exercise Prompt Stage
+  if (stage === "add-exercise-prompt") {
+    if (showExerciseList) {
+      return (
+        <div className="min-h-screen bg-[#ffffff] flex flex-col p-[10px]">
+          <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
+            <div className="flex items-center justify-between mb-4 text-[16px] leading-[120%]">
+              <span className="text-[#000000]">{formatTime(totalTime)}</span>
+              <button 
+                onClick={() => setShowExerciseList(false)} 
+                className="text-[#000000]"
+              >
+                back
+              </button>
+            </div>
+
+            <div className="mb-8">
+              <h1 className="text-[60px] leading-[110%] font-normal text-[#000000]">
+                Упражнения
+              </h1>
+            </div>
+
+            <div className="flex-1 overflow-y-auto mb-4">
+              {isLoadingExercises ? (
+                <div className="text-center text-[20px] text-[rgba(0,0,0,0.3)]">
+                  Загрузка...
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {availableExercises.map((exercise) => (
+                    <button
+                      key={exercise.id}
+                      onClick={() => addExerciseToWorkout(exercise)}
+                      className="w-full bg-[#ffffff] text-left py-4 px-6 rounded-[20px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.02)]"
+                    >
+                      <div className="font-normal text-[#000000]">{exercise.name}</div>
+                      {exercise.instructions && (
+                        <div className="text-[16px] text-[rgba(0,0,0,0.5)] mt-1 line-clamp-2">
+                          {exercise.instructions}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="min-h-screen bg-[#ffffff] flex flex-col p-[10px]">
+        <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
+          <div className="flex items-center justify-between mb-4 text-[16px] leading-[120%]">
+            <span className="text-[#000000]">{formatTime(totalTime)}</span>
+            <button onClick={cancelWorkout} className="text-[#000000]">
+              cancel
+            </button>
+          </div>
+
+          <div className="mb-8">
+            <h1 className="text-[60px] leading-[110%] font-normal text-[#000000]">
+              Что дальше?
+            </h1>
+          </div>
+
+          <div className="flex-1"></div>
+
+          <div className="fixed bottom-[10px] left-0 right-0 flex justify-center z-50">
+            <div className="w-full max-w-md px-[10px]">
+              <div
+                className="absolute inset-x-0 bottom-0 h-[200px] -z-10"
+                style={{
+                  backdropFilter: "blur(20px)",
+                  WebkitBackdropFilter: "blur(20px)",
+                  maskImage: "linear-gradient(to bottom, transparent 0%, black 100%)",
+                  WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 100%)",
+                }}
+              />
+
+              <div className="space-y-3">
+                <button
+                  onClick={fetchAllExercises}
+                  disabled={isLoadingExercises}
+                  className={`w-full bg-[#ffffff] text-[#000000] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.02)] ${
+                    isLoadingExercises ? "opacity-60 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {isLoadingExercises ? "Загрузка..." : "добавить упражнение"}
+                </button>
+                <button
+                  onClick={finishWorkout}
+                  className="w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90"
+                >
+                  закончить тренировку
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (stage === "finished") {
     return (
       <div className="min-h-screen bg-[#ffffff] flex flex-col p-[10px] relative">
@@ -1150,9 +1458,15 @@ export default function WorkoutSession() {
                 </div>
               )}
               <div className="flex items-center justify-between py-4 border-b border-[rgba(0,0,0,0.1)]">
-                <span className="text-[20px] leading-[120%] text-[#000000]">weight lifted</span>
+                <span className="text-[20px] leading-[120%] text-[#000000]">session volume</span>
                 <span className="text-[20px] leading-[120%] text-[#000000]">{sessionWeight.toFixed(0)} kg</span>
               </div>
+              {totalLifetimeWeight !== null && (
+                <div className="flex items-center justify-between py-4 border-b border-[rgba(0,0,0,0.1)]">
+                  <span className="text-[20px] leading-[120%] text-[#000000]">lifetime volume</span>
+                  <span className="text-[20px] leading-[120%] text-[#000000]">{totalLifetimeWeight.toFixed(0)} kg</span>
+                </div>
+              )}
               <div className="flex items-center justify-between py-4 border-[rgba(0,0,0,0.1)]">
                 <span className="text-[20px] leading-[120%] text-[#000000]">exercises completed</span>
                 <span className="text-[20px] leading-[120%] text-[#000000]">{Object.keys(completedSets).length}</span>

@@ -655,3 +655,195 @@ export async function deleteWorkoutSession(sessionId: string) {
   if (error) throw error
 }
 
+// ============================================
+// ОБНОВЛЕНИЕ РЕКОРДОВ
+// ============================================
+
+/**
+ * Проверить и обновить личные рекорды пользователя на основе выполненных подходов
+ * Возвращает список упражнений, где были установлены новые рекорды
+ */
+export async function updateRecordsFromWorkout(
+  userId: string,
+  workoutSessionId: string,
+  exerciseSets: {
+    exerciseId: string
+    exerciseTags: string[]
+    sets: {
+      weight?: number | null
+      reps?: number | null
+      duration?: number | null
+    }[]
+  }[]
+): Promise<{ exerciseId: string; recordType: string }[]> {
+  const supabase = createClient()
+  const newRecords: { exerciseId: string; recordType: string }[] = []
+
+  for (const exercise of exerciseSets) {
+    if (exercise.sets.length === 0) continue
+
+    const { exerciseId, exerciseTags, sets } = exercise
+
+    // Определяем тип упражнения по тегам
+    const hasDurationTag = exerciseTags.includes('duration')
+    const hasWeightTag = exerciseTags.includes('weight')
+
+    // Получаем текущий рекорд
+    const currentRecord = await getExerciseRecord(userId, exerciseId)
+
+    let newMaxWeight: number | null = null
+    let newMaxReps: number | null = null
+    let newMaxDuration: number | null = null
+    let hasNewRecord = false
+
+    if (hasDurationTag) {
+      // Для упражнений на длительность - ищем максимальное время
+      const maxDurationInSets = Math.max(
+        ...sets
+          .map((s) => s.duration)
+          .filter((d): d is number => d !== null && d !== undefined)
+      )
+
+      if (
+        maxDurationInSets > 0 &&
+        (!currentRecord?.max_duration || maxDurationInSets > currentRecord.max_duration)
+      ) {
+        newMaxDuration = maxDurationInSets
+        hasNewRecord = true
+        newRecords.push({ exerciseId, recordType: 'duration' })
+
+        // Записываем в историю
+        await addRecordToHistory(userId, exerciseId, {
+          duration: newMaxDuration,
+          workout_session_id: workoutSessionId,
+          notes: `New duration record: ${newMaxDuration}s`,
+        })
+      }
+    } else if (hasWeightTag) {
+      // Для упражнений с весом - ищем максимальный вес и максимальные повторы при этом весе
+      const maxWeightSet = sets.reduce((max, set) => {
+        const weight = set.weight ?? 0
+        const reps = set.reps ?? 0
+        const maxWeight = max.weight ?? 0
+
+        if (weight > maxWeight || (weight === maxWeight && reps > (max.reps ?? 0))) {
+          return set
+        }
+        return max
+      }, { weight: 0, reps: 0 } as { weight: number | null; reps: number | null })
+
+      const maxWeight = maxWeightSet.weight ?? 0
+      const repsAtMaxWeight = maxWeightSet.reps ?? 0
+
+      if (
+        maxWeight > 0 &&
+        (!currentRecord?.max_weight ||
+          maxWeight > currentRecord.max_weight ||
+          (maxWeight === currentRecord.max_weight &&
+            repsAtMaxWeight > (currentRecord.max_reps ?? 0)))
+      ) {
+        newMaxWeight = maxWeight
+        newMaxReps = repsAtMaxWeight
+        hasNewRecord = true
+        newRecords.push({ exerciseId, recordType: 'weight' })
+
+        // Записываем в историю
+        await addRecordToHistory(userId, exerciseId, {
+          weight: newMaxWeight,
+          reps: newMaxReps,
+          workout_session_id: workoutSessionId,
+          notes: `New weight record: ${newMaxWeight}kg × ${newMaxReps} reps`,
+        })
+      }
+    } else {
+      // Для упражнений без веса (только повторы) - ищем максимальное количество повторений
+      const maxRepsInSets = Math.max(
+        ...sets.map((s) => s.reps).filter((r): r is number => r !== null && r !== undefined)
+      )
+
+      if (
+        maxRepsInSets > 0 &&
+        (!currentRecord?.max_reps || maxRepsInSets > currentRecord.max_reps)
+      ) {
+        newMaxReps = maxRepsInSets
+        hasNewRecord = true
+        newRecords.push({ exerciseId, recordType: 'reps' })
+
+        // Записываем в историю
+        await addRecordToHistory(userId, exerciseId, {
+          reps: newMaxReps,
+          workout_session_id: workoutSessionId,
+          notes: `New reps record: ${newMaxReps} reps`,
+        })
+      }
+    }
+
+    // Обновляем рекорд, если есть новые значения
+    if (hasNewRecord) {
+      await updateExerciseRecord(userId, exerciseId, {
+        max_weight: newMaxWeight ?? currentRecord?.max_weight ?? null,
+        max_reps: newMaxReps ?? currentRecord?.max_reps ?? null,
+        max_duration: newMaxDuration ?? currentRecord?.max_duration ?? null,
+      })
+    }
+  }
+
+  return newRecords
+}
+
+/**
+ * Получить статистику пользователя
+ */
+export async function getUserStats(userId: string) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('users')
+    .select('total_workouts, total_weight_lifted')
+    .eq('id', userId)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * Обновить статистику пользователя после тренировки
+ * @param userId - ID пользователя
+ * @param totalVolume - Объем тренировки (вес × повторы)
+ */
+export async function updateUserStatsAfterWorkout(
+  userId: string,
+  totalVolume: number
+) {
+  const supabase = createClient()
+  
+  // Получаем текущую статистику
+  const { data: currentUser } = await supabase
+    .from('users')
+    .select('total_workouts, total_weight_lifted')
+    .eq('id', userId)
+    .single()
+
+  const currentWorkouts = currentUser?.total_workouts || 0
+  const currentWeightLifted = currentUser?.total_weight_lifted || 0
+
+  // Обновляем статистику
+  const { data, error } = await supabase
+    .from('users')
+    .update({
+      total_workouts: currentWorkouts + 1,
+      total_weight_lifted: currentWeightLifted + totalVolume,
+    })
+    .eq('id', userId)
+    .select()
+    .single()
+
+  if (error) throw error
+  
+  return {
+    total_workouts: currentWorkouts + 1,
+    total_weight_lifted: currentWeightLifted + totalVolume,
+    volume_added: totalVolume,
+  }
+}
+

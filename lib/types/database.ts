@@ -20,6 +20,8 @@ export interface Database {
           email: string | null
           name: string | null
           avatar_url: string | null
+          total_workouts: number
+          total_weight_lifted: number
           created_at: string
           updated_at: string
         }
@@ -28,6 +30,8 @@ export interface Database {
           email?: string | null
           name?: string | null
           avatar_url?: string | null
+          total_workouts?: number
+          total_weight_lifted?: number
           created_at?: string
           updated_at?: string
         }
@@ -36,6 +40,8 @@ export interface Database {
           email?: string | null
           name?: string | null
           avatar_url?: string | null
+          total_workouts?: number
+          total_weight_lifted?: number
           created_at?: string
           updated_at?: string
         }
@@ -210,6 +216,7 @@ export interface Database {
           started_at: string
           completed_at: string | null
           duration: number | null
+          total_volume: number | null
           notes: string | null
           created_at: string
           updated_at: string
@@ -220,6 +227,7 @@ export interface Database {
           started_at?: string
           completed_at?: string | null
           duration?: number | null
+          total_volume?: number | null
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -230,6 +238,7 @@ export interface Database {
           started_at?: string
           completed_at?: string | null
           duration?: number | null
+          total_volume?: number | null
           notes?: string | null
           created_at?: string
           updated_at?: string
