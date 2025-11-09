@@ -1,13 +1,13 @@
 "use client"
 
-import { FormEvent, useState } from "react"
+import { FormEvent, Suspense, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Mail, LogIn, ArrowLeft } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
 
-export default function LoginPage() {
+function LoginForm() {
   const params = useSearchParams()
 
   const redirectTo = params.get("redirectTo") ?? "/"
@@ -250,6 +250,23 @@ export default function LoginPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#ffffff] px-6">
+          <div className="flex items-center gap-3 text-[16px] leading-[140%] text-[rgba(0,0,0,0.6)]">
+            <Loader2 className="w-5 h-5 animate-spin text-[#000000]" />
+            Загружаем страницу входа...
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   )
 }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
@@ -21,7 +21,7 @@ function getSafeRedirect(target?: string) {
   return "/"
 }
 
-export default function AuthCallback() {
+function AuthCallbackContent() {
   const router = useRouter()
   const params = useSearchParams()
   const [status, setStatus] = useState<"pending" | "success" | "error">("pending")
@@ -115,6 +115,23 @@ export default function AuthCallback() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function AuthCallback() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#ffffff] px-6">
+          <div className="flex items-center gap-3 text-[16px] leading-[140%] text-[rgba(0,0,0,0.6)]">
+            <Loader2 className="w-5 h-5 animate-spin text-[#000000]" />
+            Готовим страницу авторизации...
+          </div>
+        </div>
+      }
+    >
+      <AuthCallbackContent />
+    </Suspense>
   )
 }
 

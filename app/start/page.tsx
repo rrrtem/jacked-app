@@ -143,7 +143,6 @@ export default function StartWorkout() {
 
     const {
       data: authSubscription,
-      error: listenerError,
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return
 
@@ -167,10 +166,6 @@ export default function StartWorkout() {
           }
         })
     })
-
-    if (listenerError) {
-      console.error(listenerError)
-    }
 
     return () => {
       isMounted = false
