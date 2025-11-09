@@ -88,7 +88,8 @@ export default function StartWorkout() {
         throw setsError
       }
 
-      const mappedPresets = mapWorkoutSets((data as WorkoutSetWithExercises[]) || [])
+      const typedData = (data ?? []) as unknown as WorkoutSetWithExercises[]
+      const mappedPresets = mapWorkoutSets(typedData)
 
       if (isMounted) {
         setPresets(mappedPresets)
