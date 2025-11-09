@@ -41,8 +41,8 @@ export function exampleBenchPress() {
   const suggestions = calculateAllLinearLoadSuggestions(5, record)
   
   suggestions.forEach((suggestion, index) => {
-    console.log(`Подход ${index + 1}: ${suggestion.weight} кг × ${suggestion.reps} повторений`)
-    console.log(`  └─ ${suggestion.note}\n`)
+    console.log(`Подход ${index + 1}: ${suggestion.weight ?? 0} кг × ${suggestion.reps ?? 0} повторений`)
+    console.log(`  └─ ${suggestion.note ?? ''}\n`)
   })
 
   return suggestions
@@ -71,8 +71,8 @@ export function examplePullUps() {
   const suggestions = calculateAllPercentageBasedSuggestions(3, record)
   
   suggestions.forEach((suggestion, index) => {
-    console.log(`Подход ${index + 1}: ${suggestion.reps} повторений`)
-    console.log(`  └─ ${suggestion.note}\n`)
+    console.log(`Подход ${index + 1}: ${suggestion.reps ?? 0} повторений`)
+    console.log(`  └─ ${suggestion.note ?? ''}\n`)
   })
 
   return suggestions
@@ -101,8 +101,8 @@ export function examplePlank() {
   const suggestions = calculateAllDurationBasedSuggestions(3, record)
   
   suggestions.forEach((suggestion, index) => {
-    console.log(`Подход ${index + 1}: ${suggestion.duration} секунд`)
-    console.log(`  └─ ${suggestion.note}\n`)
+    console.log(`Подход ${index + 1}: ${suggestion.duration ?? 0} секунд`)
+    console.log(`  └─ ${suggestion.note ?? ''}\n`)
   })
 
   return suggestions
@@ -134,10 +134,11 @@ export function exampleSmallRecord() {
   suggestions.forEach((suggestion, index) => {
     const percentage = index === 0 ? 'bar' : `${[40, 60, 80, 100][index - 1]}%`
     const calculated = index === 0 ? 20 : Math.round(30 * [40, 60, 80, 100][index - 1] / 100)
-    const correction = suggestion.weight > calculated ? '' : ` (${calculated} кг → ${suggestion.weight} кг минимум)`
+    const weight = suggestion.weight ?? 0
+    const correction = weight > calculated ? '' : ` (${calculated} кг → ${weight} кг минимум)`
     
-    console.log(`Подход ${index + 1}: ${suggestion.weight} кг × ${suggestion.reps} повторений${correction}`)
-    console.log(`  └─ ${suggestion.note}\n`)
+    console.log(`Подход ${index + 1}: ${weight} кг × ${suggestion.reps ?? 0} повторений${correction}`)
+    console.log(`  └─ ${suggestion.note ?? ''}\n`)
   })
 
   return suggestions
@@ -154,19 +155,19 @@ export function exampleNoRecord() {
   console.log('Жим штанги (без рекорда):')
   const weightSuggestions = calculateAllLinearLoadSuggestions(3, null)
   weightSuggestions.forEach((s, i) => {
-    console.log(`  Подход ${i + 1}: ${s.weight} кг × ${s.reps} повторений`)
+    console.log(`  Подход ${i + 1}: ${s.weight ?? 0} кг × ${s.reps ?? 0} повторений`)
   })
 
   console.log('\nОтжимания (без рекорда):')
   const repsSuggestions = calculateAllPercentageBasedSuggestions(3, null)
   repsSuggestions.forEach((s, i) => {
-    console.log(`  Подход ${i + 1}: ${s.reps} повторений`)
+    console.log(`  Подход ${i + 1}: ${s.reps ?? 0} повторений`)
   })
 
   console.log('\nПланка (без рекорда):')
   const durationSuggestions = calculateAllDurationBasedSuggestions(3, null)
   durationSuggestions.forEach((s, i) => {
-    console.log(`  Подход ${i + 1}: ${s.duration} секунд`)
+    console.log(`  Подход ${i + 1}: ${s.duration ?? 0} секунд`)
   })
 }
 
@@ -197,7 +198,7 @@ export function exampleAutoDetection() {
   })
   console.log('Жим лежа (теги: weight, push, chest)')
   console.log(`  → Использует Linear Load Progression`)
-  console.log(`  → Подход 3: ${weightSuggestion.weight} кг × ${weightSuggestion.reps} повторений\n`)
+  console.log(`  → Подход 3: ${weightSuggestion.weight ?? 0} кг × ${weightSuggestion.reps ?? 0} повторений\n`)
 
   // Упражнение без веса
   const bodyweightRecord: ExerciseRecord = {
@@ -215,7 +216,7 @@ export function exampleAutoDetection() {
   })
   console.log('Подтягивания (теги: pull, back)')
   console.log(`  → Использует Percentage-Based Progression`)
-  console.log(`  → Подход 2: ${repsSuggestion.reps} повторений\n`)
+  console.log(`  → Подход 2: ${repsSuggestion.reps ?? 0} повторений\n`)
 
   // Упражнение на время
   const plankRecord: ExerciseRecord = {
@@ -234,7 +235,7 @@ export function exampleAutoDetection() {
   })
   console.log('Планка (теги: duration, core)')
   console.log(`  → Использует Duration-Based Progression`)
-  console.log(`  → Подход 2: ${durationSuggestion.duration} секунд\n`)
+  console.log(`  → Подход 2: ${durationSuggestion.duration ?? 0} секунд\n`)
 }
 
 /**

@@ -721,16 +721,16 @@ export async function updateRecordsFromWorkout(
       }
     } else if (hasWeightTag) {
       // Для упражнений с весом - ищем максимальный вес и максимальные повторы при этом весе
-      const maxWeightSet = sets.reduce((max, set) => {
+      const maxWeightSet = sets.reduce<{ weight: number | null; reps: number | null }>((max, set) => {
         const weight = set.weight ?? 0
         const reps = set.reps ?? 0
         const maxWeight = max.weight ?? 0
 
         if (weight > maxWeight || (weight === maxWeight && reps > (max.reps ?? 0))) {
-          return set
+          return { weight: set.weight ?? null, reps: set.reps ?? null }
         }
         return max
-      }, { weight: 0, reps: 0 } as { weight: number | null; reps: number | null })
+      }, { weight: 0, reps: 0 })
 
       const maxWeight = maxWeightSet.weight ?? 0
       const repsAtMaxWeight = maxWeightSet.reps ?? 0
