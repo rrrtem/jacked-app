@@ -2,7 +2,7 @@
 
 ## Обзор
 
-База данных состоит из 9 основных таблиц, которые хранят информацию о пользователях, упражнениях, шаблонах тренировок, истории тренировок и истории личных рекордов.
+База данных состоит из 9 основных таблиц, которые хранят информацию о пользователях, упражнениях, шаблонах тренировок, фактически выполненных тренировках и истории личных рекордов.
 
 ## Таблицы
 
@@ -115,7 +115,6 @@
 |------|-----|----------|
 | `id` | UUID | Первичный ключ |
 | `user_id` | UUID | Внешний ключ на `users` |
-| `workout_set_id` | UUID | Внешний ключ на `workout_sets` (опционально, если создана из шаблона) |
 | `started_at` | TIMESTAMPTZ | Время начала тренировки |
 | `completed_at` | TIMESTAMPTZ | Время завершения тренировки |
 | `duration` | INTEGER | Общая длительность тренировки (секунды) |
@@ -123,10 +122,7 @@
 | `created_at` | TIMESTAMPTZ | Дата создания |
 | `updated_at` | TIMESTAMPTZ | Дата обновления |
 
-**Используется для:**
-- Отображения в календаре
-- История тренировок
-- Аналитика прогресса
+> Привязка к шаблону теперь выражается только на уровне упражнений сессии. Сама запись тренировки независима от `workout_sets`.
 
 ### 8. `workout_session_exercises` - Упражнения в сессии
 
@@ -139,11 +135,12 @@
 | `exercise_id` | UUID | Внешний ключ на `exercises` |
 | `order_index` | INTEGER | Порядковый номер упражнения в сессии |
 | `warmup_completed` | BOOLEAN | Завершена ли разминка (по умолчанию false) |
+| `workout_set_exercise_id` | UUID | Опциональная ссылка на `workout_set_exercises`, если упражнение пришло из шаблона |
 | `created_at` | TIMESTAMPTZ | Дата создания |
 
-### 9. `workout_sets_data` - Данные о подходах
+### 9. `workout_session_sets` - Данные о подходах
 
-Хранит детальную информацию о каждом подходе в упражнении.
+Хранит детальную информацию о каждом подходе в упражнении сессии.
 
 | Поле | Тип | Описание |
 |------|-----|----------|
@@ -174,11 +171,12 @@ exercises
 
 workout_sets
   └── workout_set_exercises (состав шаблона)
+      └── workout_session_exercises (упражнения сессии, взятые из шаблона)
 
 workout_sessions
   ├── exercise_record_history (рекорды, установленные в сессии)
   └── workout_session_exercises (упражнения в сессии)
-      └── workout_sets_data (подходы)
+      └── workout_session_sets (подходы)
 ```
 
 ## Примеры запросов
@@ -213,9 +211,9 @@ SELECT
 FROM workout_sessions ws
 JOIN workout_session_exercises wse ON wse.workout_session_id = ws.id
 JOIN exercises e ON e.id = wse.exercise_id
-JOIN workout_sets_data wsd ON wsd.workout_session_exercise_id = wse.id
+JOIN workout_session_sets wss ON wss.workout_session_exercise_id = wse.id
 WHERE ws.id = 'session-uuid'
-ORDER BY wse.order_index, wsd.set_number;
+ORDER BY wse.order_index, wss.set_number;
 ```
 
 ### Получить личные рекорды пользователя

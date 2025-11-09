@@ -3,8 +3,20 @@
 import Link from "next/link"
 import { Settings } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
+import { createClient } from "@/lib/supabase/client"
+import type { ExerciseRecord, Exercise } from "@/lib/types/database"
 
-function generateContinuousDates(monthsToShow: number, extraWeeksAfterToday = 2) {
+const TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
+const MONTHS_TO_SHOW = 12
+
+const formatDateKey = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function generateContinuousDates(monthsToShow: number, workoutDays: Set<string>, extraWeeksAfterToday = 2) {
   const today = new Date()
   const currentYear = today.getFullYear()
   const currentMonth = today.getMonth()
@@ -14,7 +26,6 @@ function generateContinuousDates(monthsToShow: number, extraWeeksAfterToday = 2)
   let lastActualDate: Date | null = null
 
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-  const workoutDates = [3, 5, 7, 10, 13, 15, 18, 21, 24, 27, 29]
 
   for (let i = monthsToShow - 1; i >= 0; i--) {
     const monthDate = new Date(currentYear, currentMonth - i, 1)
@@ -27,7 +38,8 @@ function generateContinuousDates(monthsToShow: number, extraWeeksAfterToday = 2)
       const isToday = year === currentYear && month === currentMonth && day === currentDate
       const isPast = dateObj < today
       const isFuture = dateObj > today
-      const hasWorkout = workoutDates.includes(day) && (isPast || isToday)
+      const dateKey = formatDateKey(dateObj)
+      const hasWorkout = workoutDays.has(dateKey) && (isPast || isToday)
       const isFirstOfMonth = day === 1
 
       allDates.push({
@@ -37,7 +49,7 @@ function generateContinuousDates(monthsToShow: number, extraWeeksAfterToday = 2)
         isFuture,
         isFirstOfMonth,
         monthAbbr: monthNames[month],
-        fullDate: `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        fullDate: dateKey,
       })
 
       lastActualDate = dateObj
@@ -74,7 +86,8 @@ function generateContinuousDates(monthsToShow: number, extraWeeksAfterToday = 2)
         const isToday = year === currentYear && month === currentMonth && day === currentDate
         const isPast = futureDate < today
         const isFuture = futureDate > today
-        const hasWorkout = workoutDates.includes(day) && (isPast || isToday)
+        const dateKey = formatDateKey(futureDate)
+        const hasWorkout = workoutDays.has(dateKey) && (isPast || isToday)
         const isFirstOfMonth = day === 1
 
         allDates.push({
@@ -84,7 +97,7 @@ function generateContinuousDates(monthsToShow: number, extraWeeksAfterToday = 2)
           isFuture,
           isFirstOfMonth,
           monthAbbr: monthNames[month],
-          fullDate: `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+          fullDate: dateKey,
         })
       }
 
@@ -107,15 +120,64 @@ function generateContinuousDates(monthsToShow: number, extraWeeksAfterToday = 2)
   return allDates
 }
 
+type ExerciseRecordWithExercise = ExerciseRecord & {
+  exercise: Pick<Exercise, "id" | "name" | "tags"> | null
+}
+
+type WorkoutSessionDateRow = {
+  id: string
+  started_at: string | null
+}
+
+const formatDecimal = (value: number | null) => {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  const numericValue = Number(value)
+  if (Number.isNaN(numericValue)) {
+    return null
+  }
+
+  return Number.isInteger(numericValue) ? numericValue.toString() : numericValue.toFixed(1)
+}
+
+const formatRecordValue = (record: ExerciseRecordWithExercise) => {
+  const weight = formatDecimal(record.max_weight)
+  const reps = record.max_reps ?? undefined
+  const duration = record.max_duration ?? undefined
+  const tags = record.exercise?.tags ?? []
+  const isBarbell = tags.includes("barbell")
+
+  const parts: string[] = []
+
+  if (weight) {
+    parts.push(`${weight}kg`)
+  }
+
+  if (typeof reps === "number" && reps > 0) {
+    parts.push(`×${reps}`)
+  }
+
+  if (parts.length) {
+    return parts.join(" ")
+  }
+
+  if (typeof duration === "number" && duration > 0) {
+    return `${duration}s`
+  }
+
+  return "—"
+}
+
 export default function WorkoutTracker() {
-  const [calendarDates, setCalendarDates] = useState<any[]>([])
+  const [calendarDates, setCalendarDates] = useState<any[]>(() => generateContinuousDates(MONTHS_TO_SHOW, new Set()))
+  const [records, setRecords] = useState<ExerciseRecordWithExercise[]>([])
+  const [calendarLoading, setCalendarLoading] = useState(true)
+  const [recordsLoading, setRecordsLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [calendarHeight, setCalendarHeight] = useState<number | null>(null)
   const calendarRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const dates = generateContinuousDates(12)
-    setCalendarDates(dates)
-  }, [])
 
   useEffect(() => {
     const updateHeight = () => {
@@ -139,6 +201,80 @@ export default function WorkoutTracker() {
   }, [calendarDates])
 
   useEffect(() => {
+    let isMounted = true
+
+    const fetchData = async () => {
+      const supabase = createClient()
+      const today = new Date()
+      const calendarStart = new Date(today.getFullYear(), today.getMonth() - (MONTHS_TO_SHOW - 1), 1)
+      const calendarEnd = new Date(today)
+      calendarEnd.setHours(23, 59, 59, 999)
+
+      setFetchError(null)
+      setCalendarLoading(true)
+      setRecordsLoading(true)
+
+      try {
+        const [sessionsResult, recordsResult] = await Promise.all([
+          supabase
+            .from("workout_sessions")
+            .select("id, started_at")
+            .eq("user_id", TEST_USER_ID)
+            .gte("started_at", calendarStart.toISOString())
+            .lte("started_at", calendarEnd.toISOString())
+            .order("started_at", { ascending: true })
+            .returns<WorkoutSessionDateRow[]>(),
+          supabase
+            .from("exercise_records")
+            .select("*, exercise:exercises(id, name, tags)")
+            .eq("user_id", TEST_USER_ID)
+            .order("last_updated", { ascending: false })
+            .returns<ExerciseRecordWithExercise[]>(),
+        ])
+
+        if (sessionsResult.error) {
+          throw sessionsResult.error
+        }
+
+        if (recordsResult.error) {
+          throw recordsResult.error
+        }
+
+        const workoutDays = new Set<string>()
+        ;(sessionsResult.data ?? []).forEach((session) => {
+          if (!session.started_at) return
+          const dateKey =
+            typeof session.started_at === "string"
+              ? session.started_at.slice(0, 10)
+              : formatDateKey(new Date(session.started_at))
+          workoutDays.add(dateKey)
+        })
+
+        if (!isMounted) return
+
+        setCalendarDates(generateContinuousDates(MONTHS_TO_SHOW, workoutDays))
+        setRecords(recordsResult.data ?? [])
+      } catch (error) {
+        console.error("Ошибка загрузки данных дашборда:", error)
+        if (isMounted) {
+          setFetchError("Не удалось загрузить данные. Попробуйте обновить страницу.")
+        }
+      } finally {
+        if (isMounted) {
+          setCalendarLoading(false)
+          setRecordsLoading(false)
+        }
+      }
+    }
+
+    fetchData()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
     if (calendarRef.current && calendarDates.length) {
       requestAnimationFrame(() => {
         if (calendarRef.current) {
@@ -149,17 +285,6 @@ export default function WorkoutTracker() {
   }, [calendarDates])
 
   const daysOfWeek = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-
-  const exercises = [
-    { id: "deadlift-1", name: "deadlift", sets: "8", weight: "60kg" },
-    { id: "bench-press-1", name: "bench press", sets: "8", weight: "40kg" },
-    { id: "front-squat-1", name: "front squat", sets: "8", weight: "30kg" },
-    { id: "barbell-row-1", name: "barbell row", sets: "8", weight: "50kg" },
-    { id: "barbell-curl-1", name: "barbell curl", sets: "10", weight: "20kg" },
-    { id: "assisted-pull-ups-1", name: "assisted pull ups", sets: "20", weight: "" },
-    { id: "push-ups-1", name: "push ups", sets: "20", weight: "" },
-    { id: "dips-1", name: "dips", sets: "8", weight: "" },
-  ]
 
   return (
     <div className="min-h-screen bg-[#ffffff] flex items-center justify-center p-[10px]">
@@ -172,6 +297,12 @@ export default function WorkoutTracker() {
           </button>
         </div>
 
+        {fetchError && (
+          <div className="mb-6 rounded-lg border border-[#ff2f00]/20 bg-[#ff2f00]/10 px-3 py-2 text-[14px] leading-[140%] text-[#ff2f00]">
+            {fetchError}
+          </div>
+        )}
+
         <div className="mb-8">
           <div className="grid grid-cols-7 gap-0 mb-2 sticky top-0 bg-[#ffffff] z-10">
             {daysOfWeek.map((day) => (
@@ -183,7 +314,8 @@ export default function WorkoutTracker() {
 
           <div
             ref={calendarRef}
-            className="overflow-y-auto pr-2 scrollbar-thin"
+            className={`overflow-y-auto pr-2 scrollbar-thin ${calendarLoading ? "opacity-60" : ""}`}
+            aria-busy={calendarLoading}
             style={calendarHeight !== null ? { height: calendarHeight } : undefined}
           >
             <div className="grid grid-cols-7 gap-0">
@@ -220,18 +352,34 @@ export default function WorkoutTracker() {
 
         {/* Exercise list */}
         <div className="space-y-0 mb-[120px]">
-          {exercises.map((exercise, index) => (
-            <Link
-              key={index}
-              href={`/exercise/${exercise.id}`}
-              className="flex items-center justify-between py-4 border-b border-[rgba(0,0,0,0.1)] transition-all duration-200 hover:bg-[#f7f7f7] cursor-pointer"
-            >
-              <span className="text-[20px] leading-[120%] text-[#000000]">{exercise.name}</span>
-              <span className="text-[20px] leading-[120%] text-[#000000]">
-                {exercise.weight ? `${exercise.sets} × ${exercise.weight}` : exercise.sets}
-              </span>
-            </Link>
-          ))}
+          {recordsLoading ? (
+            Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={`record-skeleton-${index}`}
+                className="flex items-center justify-between py-4 border-b border-[rgba(0,0,0,0.1)]"
+              >
+                <div className="h-[20px] w-32 rounded bg-[#0000000f]" />
+                <div className="h-[20px] w-20 rounded bg-[#0000000f]" />
+              </div>
+            ))
+          ) : records.length ? (
+            records.map((record) => (
+              <Link
+                key={record.id}
+                href={`/exercise/${record.exercise_id}`}
+                className="flex items-center justify-between py-4 border-b border-[rgba(0,0,0,0.1)] transition-all duration-200 hover:bg-[#f7f7f7] cursor-pointer"
+              >
+                <span className="text-[20px] leading-[120%] text-[#000000]">
+                  {record.exercise?.name ?? "unknown exercise"}
+                </span>
+                <span className="text-[20px] leading-[120%] text-[#000000]">{formatRecordValue(record)}</span>
+              </Link>
+            ))
+          ) : (
+            <div className="py-6 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.5)]">
+              Нет сохранённых рекордов
+            </div>
+          )}
         </div>
 
         {/* New Workout Button */}

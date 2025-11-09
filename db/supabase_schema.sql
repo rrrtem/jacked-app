@@ -96,7 +96,6 @@ CREATE INDEX idx_workout_set_exercises_exercise ON workout_set_exercises(exercis
 CREATE TABLE IF NOT EXISTS workout_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  workout_set_id UUID REFERENCES workout_sets(id) ON DELETE SET NULL, -- Опционально, если создана из шаблона
   started_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   duration INTEGER, -- Общая длительность в секундах
@@ -119,17 +118,19 @@ CREATE TABLE IF NOT EXISTS workout_session_exercises (
   exercise_id UUID NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
   order_index INTEGER NOT NULL DEFAULT 0, -- Порядок упражнений в сессии
   warmup_completed BOOLEAN DEFAULT FALSE,
+  workout_set_exercise_id UUID REFERENCES workout_set_exercises(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Индексы
 CREATE INDEX idx_workout_session_exercises_session ON workout_session_exercises(workout_session_id);
 CREATE INDEX idx_workout_session_exercises_exercise ON workout_session_exercises(exercise_id);
+CREATE INDEX idx_workout_session_exercises_template ON workout_session_exercises(workout_set_exercise_id);
 
 -- ============================================
--- 8. ПОДХОДЫ В УПРАЖНЕНИЯХ (Sets Data)
+-- 8. ПОДХОДЫ В СЕССИИ ТРЕНИРОВКИ
 -- ============================================
-CREATE TABLE IF NOT EXISTS workout_sets_data (
+CREATE TABLE IF NOT EXISTS workout_session_sets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   workout_session_exercise_id UUID NOT NULL REFERENCES workout_session_exercises(id) ON DELETE CASCADE,
   set_number INTEGER NOT NULL, -- Номер подхода (1, 2, 3...)
@@ -142,7 +143,7 @@ CREATE TABLE IF NOT EXISTS workout_sets_data (
 );
 
 -- Индексы
-CREATE INDEX idx_workout_sets_data_exercise ON workout_sets_data(workout_session_exercise_id);
+CREATE INDEX idx_workout_session_sets_exercise ON workout_session_sets(workout_session_exercise_id);
 
 -- ============================================
 -- 9. ИСТОРИЯ ЛИЧНЫХ РЕКОРДОВ
@@ -205,7 +206,7 @@ ALTER TABLE workout_sets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workout_set_exercises ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workout_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workout_session_exercises ENABLE ROW LEVEL SECURITY;
-ALTER TABLE workout_sets_data ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workout_session_sets ENABLE ROW LEVEL SECURITY;
 
 -- Политики для users (каждый видит только свои данные)
 CREATE POLICY "Users can view own profile" ON users
@@ -220,7 +221,10 @@ CREATE POLICY "Exercises are viewable by everyone" ON exercises
 
 -- Политики для exercise_records (только свои рекорды)
 CREATE POLICY "Users can view own records" ON exercise_records
-  FOR SELECT USING (auth.uid() = user_id);
+  FOR SELECT USING (
+    auth.uid() = user_id
+    OR (auth.uid() IS NULL AND user_id = '00000000-0000-0000-0000-000000000001')
+  );
 
 CREATE POLICY "Users can insert own records" ON exercise_records
   FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -230,7 +234,10 @@ CREATE POLICY "Users can update own records" ON exercise_records
 
 -- Политики для exercise_record_history (только своя история рекордов)
 CREATE POLICY "Users can view own record history" ON exercise_record_history
-  FOR SELECT USING (auth.uid() = user_id);
+  FOR SELECT USING (
+    auth.uid() = user_id
+    OR (auth.uid() IS NULL AND user_id = '00000000-0000-0000-0000-000000000001')
+  );
 
 CREATE POLICY "Users can insert own record history" ON exercise_record_history
   FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -293,7 +300,10 @@ CREATE POLICY "Users can delete exercises from own workout sets" ON workout_set_
 
 -- Политики для workout_sessions (только свои сессии)
 CREATE POLICY "Users can view own workout sessions" ON workout_sessions
-  FOR SELECT USING (auth.uid() = user_id);
+  FOR SELECT USING (
+    auth.uid() = user_id
+    OR (auth.uid() IS NULL AND user_id = '00000000-0000-0000-0000-000000000001')
+  );
 
 CREATE POLICY "Users can insert own workout sessions" ON workout_sessions
   FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -310,7 +320,10 @@ CREATE POLICY "Users can view exercises in own sessions" ON workout_session_exer
     EXISTS (
       SELECT 1 FROM workout_sessions 
       WHERE workout_sessions.id = workout_session_exercises.workout_session_id 
-      AND workout_sessions.user_id = auth.uid()
+      AND (
+        workout_sessions.user_id = auth.uid()
+        OR (auth.uid() IS NULL AND workout_sessions.user_id = '00000000-0000-0000-0000-000000000001')
+      )
     )
   );
 
@@ -341,43 +354,46 @@ CREATE POLICY "Users can delete exercises from own sessions" ON workout_session_
     )
   );
 
--- Политики для workout_sets_data
-CREATE POLICY "Users can view sets in own sessions" ON workout_sets_data
+-- Политики для workout_session_sets
+CREATE POLICY "Users can view sets in own sessions" ON workout_session_sets
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM workout_session_exercises wse
       JOIN workout_sessions ws ON ws.id = wse.workout_session_id
-      WHERE wse.id = workout_sets_data.workout_session_exercise_id 
-      AND ws.user_id = auth.uid()
+      WHERE wse.id = workout_session_sets.workout_session_exercise_id 
+      AND (
+        ws.user_id = auth.uid()
+        OR (auth.uid() IS NULL AND ws.user_id = '00000000-0000-0000-0000-000000000001')
+      )
     )
   );
 
-CREATE POLICY "Users can insert sets in own sessions" ON workout_sets_data
+CREATE POLICY "Users can insert sets in own sessions" ON workout_session_sets
   FOR INSERT WITH CHECK (
     EXISTS (
       SELECT 1 FROM workout_session_exercises wse
       JOIN workout_sessions ws ON ws.id = wse.workout_session_id
-      WHERE wse.id = workout_sets_data.workout_session_exercise_id 
+      WHERE wse.id = workout_session_sets.workout_session_exercise_id 
       AND ws.user_id = auth.uid()
     )
   );
 
-CREATE POLICY "Users can update sets in own sessions" ON workout_sets_data
+CREATE POLICY "Users can update sets in own sessions" ON workout_session_sets
   FOR UPDATE USING (
     EXISTS (
       SELECT 1 FROM workout_session_exercises wse
       JOIN workout_sessions ws ON ws.id = wse.workout_session_id
-      WHERE wse.id = workout_sets_data.workout_session_exercise_id 
+      WHERE wse.id = workout_session_sets.workout_session_exercise_id 
       AND ws.user_id = auth.uid()
     )
   );
 
-CREATE POLICY "Users can delete sets from own sessions" ON workout_sets_data
+CREATE POLICY "Users can delete sets from own sessions" ON workout_session_sets
   FOR DELETE USING (
     EXISTS (
       SELECT 1 FROM workout_session_exercises wse
       JOIN workout_sessions ws ON ws.id = wse.workout_session_id
-      WHERE wse.id = workout_sets_data.workout_session_exercise_id 
+      WHERE wse.id = workout_session_sets.workout_session_exercise_id 
       AND ws.user_id = auth.uid()
     )
   );

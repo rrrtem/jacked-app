@@ -207,7 +207,6 @@ export interface Database {
         Row: {
           id: string
           user_id: string
-          workout_set_id: string | null
           started_at: string
           completed_at: string | null
           duration: number | null
@@ -218,7 +217,6 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          workout_set_id?: string | null
           started_at?: string
           completed_at?: string | null
           duration?: number | null
@@ -229,7 +227,6 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
-          workout_set_id?: string | null
           started_at?: string
           completed_at?: string | null
           duration?: number | null
@@ -246,6 +243,7 @@ export interface Database {
           exercise_id: string
           order_index: number
           warmup_completed: boolean | null
+          workout_set_exercise_id: string | null
           created_at: string
         }
         Insert: {
@@ -254,6 +252,7 @@ export interface Database {
           exercise_id: string
           order_index?: number
           warmup_completed?: boolean | null
+          workout_set_exercise_id?: string | null
           created_at?: string
         }
         Update: {
@@ -262,11 +261,12 @@ export interface Database {
           exercise_id?: string
           order_index?: number
           warmup_completed?: boolean | null
+          workout_set_exercise_id?: string | null
           created_at?: string
         }
         Relationships: []
       }
-      workout_sets_data: {
+      workout_session_sets: {
         Row: {
           id: string
           workout_session_exercise_id: string
@@ -327,7 +327,7 @@ export type WorkoutSet = Database['public']['Tables']['workout_sets']['Row']
 export type WorkoutSetExercise = Database['public']['Tables']['workout_set_exercises']['Row']
 export type WorkoutSession = Database['public']['Tables']['workout_sessions']['Row']
 export type WorkoutSessionExercise = Database['public']['Tables']['workout_session_exercises']['Row']
-export type WorkoutSetData = Database['public']['Tables']['workout_sets_data']['Row']
+export type WorkoutSessionSet = Database['public']['Tables']['workout_session_sets']['Row']
 
 // Типы для вставки (Insert)
 export type UserInsert = Database['public']['Tables']['users']['Insert']
@@ -338,7 +338,7 @@ export type WorkoutSetInsert = Database['public']['Tables']['workout_sets']['Ins
 export type WorkoutSetExerciseInsert = Database['public']['Tables']['workout_set_exercises']['Insert']
 export type WorkoutSessionInsert = Database['public']['Tables']['workout_sessions']['Insert']
 export type WorkoutSessionExerciseInsert = Database['public']['Tables']['workout_session_exercises']['Insert']
-export type WorkoutSetDataInsert = Database['public']['Tables']['workout_sets_data']['Insert']
+export type WorkoutSessionSetInsert = Database['public']['Tables']['workout_session_sets']['Insert']
 
 // Типы для обновления (Update)
 export type UserUpdate = Database['public']['Tables']['users']['Update']
@@ -349,7 +349,7 @@ export type WorkoutSetUpdate = Database['public']['Tables']['workout_sets']['Upd
 export type WorkoutSetExerciseUpdate = Database['public']['Tables']['workout_set_exercises']['Update']
 export type WorkoutSessionUpdate = Database['public']['Tables']['workout_sessions']['Update']
 export type WorkoutSessionExerciseUpdate = Database['public']['Tables']['workout_session_exercises']['Update']
-export type WorkoutSetDataUpdate = Database['public']['Tables']['workout_sets_data']['Update']
+export type WorkoutSessionSetUpdate = Database['public']['Tables']['workout_session_sets']['Update']
 
 // Расширенные типы с JOIN данными
 
@@ -375,7 +375,7 @@ export type WorkoutSetWithExercises = WorkoutSet & {
 export type WorkoutSessionWithDetails = WorkoutSession & {
   exercises: (WorkoutSessionExercise & {
     exercise: Exercise
-    sets: WorkoutSetData[]
+    sets: WorkoutSessionSet[]
   })[]
 }
 
@@ -383,10 +383,10 @@ export type WorkoutSessionWithDetails = WorkoutSession & {
  * Данные для создания новой тренировочной сессии
  */
 export interface CreateWorkoutSessionData {
-  workout_set_id?: string
   exercises: {
     exercise_id: string
     order_index: number
+    workout_set_exercise_id?: string | null
     target_sets?: number
     target_reps?: number
     target_weight?: number
@@ -396,7 +396,7 @@ export interface CreateWorkoutSessionData {
 /**
  * Данные для сохранения подхода
  */
-export interface SaveSetData {
+export interface SaveWorkoutSessionSetData {
   workout_session_exercise_id: string
   set_number: number
   weight?: number
@@ -424,7 +424,6 @@ export interface WorkoutHistoryFilters {
   user_id: string
   date_from?: string
   date_to?: string
-  workout_set_id?: string
   limit?: number
   offset?: number
 }

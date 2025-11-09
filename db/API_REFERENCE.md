@@ -134,15 +134,16 @@ const workoutSetExercise = await addExerciseToWorkoutSet(
 import { createWorkoutSession } from '@/lib/supabase/queries'
 
 const session = await createWorkoutSession(userId, {
-  workout_set_id: 'set-uuid', // опционально
   exercises: [
-    { exercise_id: 'ex1-uuid', order_index: 0 },
+    { exercise_id: 'ex1-uuid', order_index: 0, workout_set_exercise_id: 'template-ex1-uuid' },
     { exercise_id: 'ex2-uuid', order_index: 1 },
     { exercise_id: 'ex3-uuid', order_index: 2 }
   ]
 })
 // => WorkoutSession
 ```
+
+> `workout_set_exercise_id` — опциональная ссылка на упражнение из шаблона. Если упражнение добавлено вручную, свойство не передаётся.
 
 ### Получить активную сессию
 
@@ -167,16 +168,16 @@ const session = await completeWorkoutSession(sessionId)
 ### Сохранить подход
 
 ```typescript
-import { saveWorkoutSet } from '@/lib/supabase/queries'
+import { saveWorkoutSessionSet } from '@/lib/supabase/queries'
 
-const setData = await saveWorkoutSet({
+const setData = await saveWorkoutSessionSet({
   workout_session_exercise_id: 'wse-uuid',
   set_number: 1,
   weight: 50,
   reps: 10,
   completed: true
 })
-// => WorkoutSetData
+// => WorkoutSessionSet
 ```
 
 ### Отметить разминку завершенной
@@ -271,7 +272,6 @@ const calendar = await getWorkoutCalendar(userId, 2025, 11)
 {
   id: string
   user_id: string
-  workout_set_id: string | null
   started_at: string
   completed_at: string | null
   duration: number | null // в секундах
@@ -281,7 +281,21 @@ const calendar = await getWorkoutCalendar(userId, 2025, 11)
 }
 ```
 
-### WorkoutSetData
+### WorkoutSessionExercise
+
+```typescript
+{
+  id: string
+  workout_session_id: string
+  exercise_id: string
+  order_index: number
+  warmup_completed: boolean
+  workout_set_exercise_id: string | null
+  created_at: string
+}
+```
+
+### WorkoutSessionSet
 
 ```typescript
 {

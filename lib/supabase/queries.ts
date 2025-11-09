@@ -11,7 +11,7 @@ import type {
   WorkoutSession,
   WorkoutSessionWithDetails,
   CreateWorkoutSessionData,
-  SaveSetData,
+  SaveWorkoutSessionSetData,
   WorkoutHistoryFilters,
   ExerciseRecordUpdate,
   ExerciseRecordInsert,
@@ -277,7 +277,6 @@ export async function createWorkoutSession(
     .from('workout_sessions')
     .insert({
       user_id: userId,
-      workout_set_id: data.workout_set_id,
       started_at: new Date().toISOString(),
     })
     .select()
@@ -293,6 +292,7 @@ export async function createWorkoutSession(
         workout_session_id: session.id,
         exercise_id: ex.exercise_id,
         order_index: ex.order_index,
+        workout_set_exercise_id: ex.workout_set_exercise_id ?? null,
       }))
     )
 
@@ -315,7 +315,7 @@ export async function getActiveWorkoutSession(
       exercises:workout_session_exercises(
         *,
         exercise:exercises(*),
-        sets:workout_sets_data(*)
+        sets:workout_session_sets(*)
       )
     `)
     .eq('user_id', userId)
@@ -377,10 +377,10 @@ export async function completeWorkoutSession(sessionId: string) {
 /**
  * Сохранить данные подхода
  */
-export async function saveWorkoutSet(data: SaveSetData) {
+export async function saveWorkoutSessionSet(data: SaveWorkoutSessionSetData) {
   const supabase = createClient()
   const { data: setData, error } = await supabase
-    .from('workout_sets_data')
+    .from('workout_session_sets')
     .insert(data)
     .select()
     .single()
@@ -411,10 +411,6 @@ export async function getWorkoutHistory(
     query = query.lte('started_at', filters.date_to)
   }
 
-  if (filters.workout_set_id) {
-    query = query.eq('workout_set_id', filters.workout_set_id)
-  }
-
   if (filters.limit) {
     query = query.limit(filters.limit)
   }
@@ -443,7 +439,7 @@ export async function getWorkoutSessionById(
       exercises:workout_session_exercises(
         *,
         exercise:exercises(*),
-        sets:workout_sets_data(*)
+        sets:workout_session_sets(*)
       )
     `)
     .eq('id', sessionId)
