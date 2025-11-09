@@ -66,14 +66,32 @@ function AuthCallbackContent() {
       setMessage("Подтверждаем вход...")
 
       try {
-        const { data, error } = await (supabase.auth as any).getSessionFromUrl({
-          storeSession: true,
-        })
+        // Получаем код из URL параметров
+        const code = params.get("code")
+        
+        if (!code) {
+          // Если нет кода, пробуем получить сессию напрямую (для magic link)
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+          
+          if (!isActive) return
+
+          if (sessionError || !sessionData.session) {
+            console.error("[AuthCallback] no code and no session:", sessionError)
+            handleError("Сессия не найдена. Отправьте ссылку ещё раз.")
+            return
+          }
+
+          finalize()
+          return
+        }
+
+        // Обмениваем код на сессию
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
         if (!isActive) return
 
         if (error) {
-          console.error("[AuthCallback] getSessionFromUrl error:", error)
+          console.error("[AuthCallback] exchangeCodeForSession error:", error)
           handleError(error.message ?? "Не удалось подтвердить сессию. Попробуйте снова.")
           return
         }
@@ -83,7 +101,6 @@ function AuthCallbackContent() {
           return
         }
 
-        supabase.auth.startAutoRefresh()
         finalize()
       } catch (err) {
         console.error("[AuthCallback] unexpected error:", err)
@@ -95,7 +112,6 @@ function AuthCallbackContent() {
 
     return () => {
       isActive = false
-      supabase.auth.stopAutoRefresh()
     }
   }, [params, redirectTarget, router])
 
