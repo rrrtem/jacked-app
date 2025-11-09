@@ -3,10 +3,9 @@
 import Link from "next/link"
 import { Settings } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { ExerciseRecord, Exercise } from "@/lib/types/database"
-
-const TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
 const LOOKBACK_DAYS = 14
 
 const formatDateKey = (date: Date) => {
@@ -161,6 +160,7 @@ const formatRecordValue = (record: ExerciseRecordWithExercise) => {
 }
 
 export default function WorkoutTracker() {
+  const router = useRouter()
   const [calendarDates, setCalendarDates] = useState<any[]>(() => {
     const today = normalizeDate(new Date())
     const initialStart = new Date(today)
@@ -209,10 +209,26 @@ export default function WorkoutTracker() {
       setRecordsLoading(true)
 
       try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession()
+
+        if (sessionError) {
+          throw sessionError
+        }
+
+        const userId = session?.user?.id
+
+        if (!userId) {
+          router.replace("/login")
+          return
+        }
+
         const earliestSessionResult = await supabase
           .from("workout_sessions")
           .select("started_at")
-          .eq("user_id", TEST_USER_ID)
+          .eq("user_id", userId)
           .order("started_at", { ascending: true })
           .limit(1)
           .returns<Array<Pick<WorkoutSessionDateRow, "started_at">>>()
@@ -238,7 +254,7 @@ export default function WorkoutTracker() {
           supabase
             .from("workout_sessions")
             .select("id, started_at")
-            .eq("user_id", TEST_USER_ID)
+            .eq("user_id", userId)
             .gte("started_at", calendarStart.toISOString())
             .lte("started_at", calendarEnd.toISOString())
             .order("started_at", { ascending: true })
@@ -246,7 +262,7 @@ export default function WorkoutTracker() {
           supabase
             .from("exercise_records")
             .select("*, exercise:exercises(id, name, tags)")
-            .eq("user_id", TEST_USER_ID)
+            .eq("user_id", userId)
             .order("last_updated", { ascending: false })
             .returns<ExerciseRecordWithExercise[]>(),
         ])
@@ -291,7 +307,7 @@ export default function WorkoutTracker() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [router])
 
   useEffect(() => {
     if (calendarRef.current && calendarDates.length) {
@@ -311,9 +327,17 @@ export default function WorkoutTracker() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-[32px] leading-[120%] font-normal text-[#000000]">get jacked</h1>
-          <button className="p-2" aria-label="Settings">
-            <Settings className="w-6 h-6 text-[#000000]" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/history"
+              className="px-4 py-2 text-[16px] leading-[120%] text-[#000000] hover:bg-[#f7f7f7] rounded-lg transition-colors"
+            >
+              история
+            </Link>
+            <button className="p-2" aria-label="Settings">
+              <Settings className="w-6 h-6 text-[#000000]" />
+            </button>
+          </div>
         </div>
 
         {fetchError && (

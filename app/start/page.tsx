@@ -11,9 +11,11 @@ import type { WorkoutSetWithExercises } from "@/lib/types/database"
 
 type Exercise = {
   id: string
+  exerciseId: string | null
   name: string
   sets: number | null
   warmupTime?: string
+  tags?: string[] | null
 }
 
 type Preset = {
@@ -44,22 +46,43 @@ export default function StartWorkout() {
 
     const mapWorkoutSets = (sets: WorkoutSetWithExercises[]): Preset[] => {
       return sets.map((preset) => {
-        const exercises = (preset.exercises || [])
+        const sortedExercises = (preset.exercises || [])
           .slice()
           .sort((a, b) => a.order_index - b.order_index)
           .map((item) => {
             const exerciseName = item.exercise?.name ?? "Exercise"
-            const normalizedName = exerciseName.toLowerCase()
+            const normalizedName = exerciseName.trim().toLowerCase()
             const isWarmup =
-              normalizedName.includes("warm") || normalizedName.includes("размин")
+              normalizedName === "workout" ||
+              normalizedName.includes("warm") ||
+              normalizedName.includes("размин")
+            const displayName = normalizedName === "workout" ? "warm up" : exerciseName
 
             return {
               id: item.id,
-              name: exerciseName,
+              exerciseId: item.exercise?.id ?? null,
+              name: displayName,
               sets: item.target_sets ?? null,
               warmupTime: isWarmup ? "10:00" : undefined,
+              tags: Array.isArray(item.exercise?.tags) ? item.exercise?.tags : null,
             }
           })
+
+        const hasWarmupRow = sortedExercises.some((exercise) => exercise.warmupTime !== undefined)
+
+        const exercises = hasWarmupRow
+          ? sortedExercises
+          : [
+              {
+                id: `warmup-${preset.id}`,
+                exerciseId: null,
+                name: "warm up",
+                sets: null,
+                warmupTime: "10:00",
+                tags: null,
+              },
+              ...sortedExercises,
+            ]
 
         return {
           id: preset.id,
@@ -388,12 +411,28 @@ export default function StartWorkout() {
                   // Очищаем предыдущее состояние тренировки
                   localStorage.removeItem("workoutState")
                   
-                  // Сохраняем данные о новой тренировке в localStorage
+                  // Подготавливаем данные для тренировки
                   const warmupExercise = activePresetData?.exercises.find((ex) => ex.warmupTime !== undefined)
                   const warmupMinutes = warmupExercise?.warmupTime
                     ? parseInt(warmupExercise.warmupTime.split(":")[0])
                     : 10
                   localStorage.setItem("workoutWarmupMinutes", warmupMinutes.toString())
+                  
+                  // Сохраняем выбранные упражнения (без warm up)
+                  const selectedExercises = activePresetData.exercises
+                    .filter((ex) => ex.warmupTime === undefined)
+                    .map((ex) => ({
+                      id: ex.exerciseId ?? ex.id,
+                      exerciseId: ex.exerciseId ?? null,
+                      workoutEntryId: ex.id,
+                      name: ex.name,
+                      sets: ex.sets,
+                      tags: ex.tags ?? null,
+                    }))
+                  
+                  localStorage.setItem("workoutExercises", JSON.stringify(selectedExercises))
+                  localStorage.setItem("workoutSetId", activePreset || "")
+                  
                   window.location.href = "/workout/1"
                 }}
                 disabled={isStartDisabled}

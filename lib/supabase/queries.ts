@@ -642,3 +642,16 @@ export async function getProgressChartData(
   })) || []
 }
 
+/**
+ * Удалить тренировочную сессию
+ */
+export async function deleteWorkoutSession(sessionId: string) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('workout_sessions')
+    .delete()
+    .eq('id', sessionId)
+
+  if (error) throw error
+}
+
