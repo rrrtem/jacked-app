@@ -14,7 +14,7 @@ WITH target_user AS (
 set_definitions AS (
   SELECT target_user.id AS user_id, data.set_name, data.description
   FROM target_user
-  JOIN (
+  CROSS JOIN (
     VALUES
       ('d1', 'Upper body strength emphasis: overhead press, deadlift, barbell curl.'),
       ('d2', 'Horizontal push & pull pairing: bench press with barbell row.'),

@@ -20,6 +20,13 @@ type ExerciseData = {
   tags?: string[] | null
 }
 
+type DbExercise = {
+  id: string
+  name: string
+  instructions: string | null
+  tags: string[] | null
+}
+
 type CompletedSet = {
   set: number
   weight?: string | null
@@ -199,7 +206,7 @@ export default function WorkoutSession() {
             .map((ex: ExerciseData) => ex.exerciseId)
             .filter((id): id is string => Boolean(id))
 
-          const exercisesDataMap = new Map<string, { id: string; name: string; instructions: string | null }>()
+          const exercisesDataMap = new Map<string, DbExercise>()
 
           if (knownExerciseIds.length > 0) {
             const { data: exercisesData } = await supabase
