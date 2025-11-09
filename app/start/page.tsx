@@ -2,12 +2,15 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { X, Mic, Trash2 } from "lucide-react"
 
+import { createClient } from "@/lib/supabase/client"
+import type { WorkoutSetWithExercises } from "@/lib/types/database"
+
 type Exercise = {
-  id: number
+  id: string
   name: string
   sets: number | null
   warmupTime?: string
@@ -22,46 +25,171 @@ type Preset = {
 export default function StartWorkout() {
   const [showAdjustOverlay, setShowAdjustOverlay] = useState(false)
   const [inputText, setInputText] = useState("")
-  const [activePreset, setActivePreset] = useState("d1")
-  const [presets, setPresets] = useState<Preset[]>([
-    {
-      id: "d1",
-      label: "d1",
-      exercises: [
-        { id: 1, name: "warm up", sets: null, warmupTime: "10:00" },
-        { id: 2, name: "squat", sets: 4 },
-        { id: 3, name: "leg press", sets: 3 },
-      ],
-    },
-    {
-      id: "d2",
-      label: "d2",
-      exercises: [
-        { id: 4, name: "warm up", sets: null, warmupTime: "10:00" },
-        { id: 5, name: "overhead press", sets: 3 },
-        { id: 6, name: "lateral raise", sets: 3 },
-      ],
-    },
-    {
-      id: "d3",
-      label: "d3",
-      exercises: [
-        { id: 7, name: "warm up", sets: null, warmupTime: "10:00" },
-        { id: 8, name: "pull ups", sets: 3 },
-        { id: 9, name: "barbell row", sets: 4 },
-      ],
-    },
-  ])
-  const [swipedExerciseId, setSwipedExerciseId] = useState<number | null>(null)
+  const [activePreset, setActivePreset] = useState<string | null>(null)
+  const [presets, setPresets] = useState<Preset[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [swipedExerciseId, setSwipedExerciseId] = useState<string | null>(null)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [swipeDistance, setSwipeDistance] = useState(0)
-  const [editingWarmupId, setEditingWarmupId] = useState<number | null>(null)
+  const [editingWarmupId, setEditingWarmupId] = useState<string | null>(null)
   const [warmupInputValue, setWarmupInputValue] = useState<string>("")
   const warmupInputRef = useRef<HTMLInputElement | null>(null)
 
-  const activePresetData = presets.find((p) => p.id === activePreset)
+  const supabaseClientRef = useRef(createClient())
 
-  const handleDeleteExercise = (exerciseId: number) => {
+  useEffect(() => {
+    const supabase = supabaseClientRef.current
+    let isMounted = true
+
+    const mapWorkoutSets = (sets: WorkoutSetWithExercises[]): Preset[] => {
+      return sets.map((preset) => {
+        const exercises = (preset.exercises || [])
+          .slice()
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((item) => {
+            const exerciseName = item.exercise?.name ?? "Exercise"
+            const normalizedName = exerciseName.toLowerCase()
+            const isWarmup =
+              normalizedName.includes("warm") || normalizedName.includes("размин")
+
+            return {
+              id: item.id,
+              name: exerciseName,
+              sets: item.target_sets ?? null,
+              warmupTime: isWarmup ? "10:00" : undefined,
+            }
+          })
+
+        return {
+          id: preset.id,
+          label: preset.name,
+          exercises,
+        }
+      })
+    }
+
+    const loadSetsForUser = async (userId: string) => {
+      const { data, error: setsError } = await supabase
+        .from("workout_sets")
+        .select(
+          `
+            *,
+            exercises:workout_set_exercises(
+              *,
+              exercise:exercises(*)
+            )
+          `,
+        )
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true })
+
+      if (setsError) {
+        throw setsError
+      }
+
+      const mappedPresets = mapWorkoutSets((data as WorkoutSetWithExercises[]) || [])
+
+      if (isMounted) {
+        setPresets(mappedPresets)
+        setActivePreset((prev) => {
+          if (prev && mappedPresets.some((preset) => preset.id === prev)) {
+            return prev
+          }
+          return mappedPresets.length > 0 ? mappedPresets[0].id : null
+        })
+        setError(null)
+      }
+    }
+
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession()
+
+        if (sessionError) {
+          throw sessionError
+        }
+
+        if (!session?.user) {
+          if (isMounted) {
+            setPresets([])
+            setActivePreset(null)
+            setError("Чтобы увидеть свои шаблоны, войдите в аккаунт.")
+          }
+          return
+        }
+
+        await loadSetsForUser(session.user.id)
+      } catch (err) {
+        console.error(err)
+        if (isMounted) {
+          setError("Не удалось загрузить шаблоны тренировок. Попробуйте позже.")
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadData()
+
+    const {
+      data: authSubscription,
+      error: listenerError,
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return
+
+      if (!session?.user) {
+        setPresets([])
+        setActivePreset(null)
+        setError("Чтобы увидеть свои шаблоны, войдите в аккаунт.")
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      loadSetsForUser(session.user.id)
+        .catch((err) => {
+          console.error(err)
+          setError("Не удалось загрузить шаблоны тренировок. Попробуйте позже.")
+        })
+        .finally(() => {
+          if (isMounted) {
+            setLoading(false)
+          }
+        })
+    })
+
+    if (listenerError) {
+      console.error(listenerError)
+    }
+
+    return () => {
+      isMounted = false
+      authSubscription?.subscription?.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    setEditingWarmupId(null)
+    setWarmupInputValue("")
+    setSwipedExerciseId(null)
+    setSwipeDistance(0)
+  }, [activePreset])
+
+  const activePresetData = activePreset ? presets.find((p) => p.id === activePreset) : undefined
+  const isStartDisabled = !activePresetData || activePresetData.exercises.length === 0
+
+  const handleDeleteExercise = (exerciseId: string) => {
+    if (!activePreset) return
+
     setPresets((prev) =>
       prev.map((preset) =>
         preset.id === activePreset
@@ -76,13 +204,13 @@ export default function StartWorkout() {
     setSwipeDistance(0)
   }
 
-  const handleTouchStart = (e: React.TouchEvent, exerciseId: number, isWarmup: boolean) => {
+  const handleTouchStart = (e: React.TouchEvent, exerciseId: string, isWarmup: boolean) => {
     if (isWarmup) return // Не даем свайпать warm up
     setTouchStart(e.touches[0].clientX)
     setSwipedExerciseId(exerciseId)
   }
 
-  const handleTouchMove = (e: React.TouchEvent, exerciseId: number, isWarmup: boolean) => {
+  const handleTouchMove = (e: React.TouchEvent, exerciseId: string, isWarmup: boolean) => {
     if (isWarmup || touchStart === null) return
 
     const touchCurrent = e.touches[0].clientX
@@ -94,7 +222,7 @@ export default function StartWorkout() {
     }
   }
 
-  const handleTouchEnd = (e: React.TouchEvent, exerciseId: number, isWarmup: boolean) => {
+  const handleTouchEnd = (e: React.TouchEvent, exerciseId: string, isWarmup: boolean) => {
     if (isWarmup || touchStart === null) return
 
     // If swiped more than 60px (reaching trash icon), delete
@@ -109,7 +237,7 @@ export default function StartWorkout() {
     setTouchStart(null)
   }
 
-  const handleWarmupFocus = (exerciseId: number, currentTime: string) => {
+  const handleWarmupFocus = (exerciseId: string, currentTime: string) => {
     setEditingWarmupId(exerciseId)
     // Извлекаем минуты из формата MM:SS
     const minutes = currentTime.split(":")[0]
@@ -120,7 +248,7 @@ export default function StartWorkout() {
     }, 0)
   }
 
-  const handleWarmupBlur = (exerciseId: number) => {
+  const handleWarmupBlur = (exerciseId: string) => {
     setEditingWarmupId(null)
     // Форматируем введенное значение в MM:SS
     const minutes = warmupInputValue || "10"
@@ -182,49 +310,67 @@ export default function StartWorkout() {
 
         {/* Exercise List */}
         <div className="space-y-0 mb-[200px] border-t border-[rgba(0,0,0,0.1)]">
-          {activePresetData?.exercises.map((exercise) => {
-            const isWarmup = exercise.name === "warm up"
-            return (
-              <div
-                key={exercise.id}
-                className="relative overflow-hidden"
-                onTouchStart={(e) => handleTouchStart(e, exercise.id, isWarmup)}
-                onTouchMove={(e) => handleTouchMove(e, exercise.id, isWarmup)}
-                onTouchEnd={(e) => handleTouchEnd(e, exercise.id, isWarmup)}
-              >
+          {loading ? (
+            <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
+              Загружаем шаблоны...
+            </div>
+          ) : error ? (
+            <div className="py-12 text-center text-[16px] leading-[140%] text-[#ff2f00]">
+              {error}
+            </div>
+          ) : !activePresetData ? (
+            <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
+              Шаблоны не найдены. Создайте новый сет в приложении.
+            </div>
+          ) : activePresetData.exercises.length === 0 ? (
+            <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
+              В этом шаблоне пока нет упражнений.
+            </div>
+          ) : (
+            activePresetData.exercises.map((exercise) => {
+              const isWarmup = exercise.warmupTime !== undefined
+              return (
                 <div
-                  className="flex items-center justify-between py-5 border-b border-[rgba(0,0,0,0.1)] bg-[#ffffff] transition-transform"
-                  style={{
-                    transform: swipedExerciseId === exercise.id ? `translateX(-${swipeDistance}px)` : "translateX(0)",
-                  }}
+                  key={exercise.id}
+                  className="relative overflow-hidden"
+                  onTouchStart={(e) => handleTouchStart(e, exercise.id, isWarmup)}
+                  onTouchMove={(e) => handleTouchMove(e, exercise.id, isWarmup)}
+                  onTouchEnd={(e) => handleTouchEnd(e, exercise.id, isWarmup)}
                 >
-                  <span className="text-[20px] leading-[120%] text-[#000000]">{exercise.name}</span>
-                  {isWarmup ? (
-                    <input
-                      ref={warmupInputRef}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={editingWarmupId === exercise.id ? warmupInputValue : exercise.warmupTime || "10:00"}
-                      onChange={handleWarmupChange}
-                      onFocus={() => handleWarmupFocus(exercise.id, exercise.warmupTime || "10:00")}
-                      onBlur={() => handleWarmupBlur(exercise.id)}
-                      className="text-[20px] leading-[120%] text-[#000000] bg-transparent outline-none text-right w-[80px]"
-                    />
-                  ) : null}
-                </div>
-
-                {swipedExerciseId === exercise.id && !isWarmup && (
                   <div
-                    className="absolute right-0 top-0 h-full w-20 bg-[#ff2f00] flex items-center justify-center"
-                    onClick={() => handleDeleteExercise(exercise.id)}
+                    className="flex items-center justify-between py-5 border-b border-[rgba(0,0,0,0.1)] bg-[#ffffff] transition-transform"
+                    style={{
+                      transform: swipedExerciseId === exercise.id ? `translateX(-${swipeDistance}px)` : "translateX(0)",
+                    }}
                   >
-                    <Trash2 className="w-6 h-6 text-[#ffffff]" />
+                    <span className="text-[20px] leading-[120%] text-[#000000]">{exercise.name}</span>
+                    {isWarmup ? (
+                      <input
+                        ref={warmupInputRef}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={editingWarmupId === exercise.id ? warmupInputValue : exercise.warmupTime || "10:00"}
+                        onChange={handleWarmupChange}
+                        onFocus={() => handleWarmupFocus(exercise.id, exercise.warmupTime || "10:00")}
+                        onBlur={() => handleWarmupBlur(exercise.id)}
+                        className="text-[20px] leading-[120%] text-[#000000] bg-transparent outline-none text-right w-[80px]"
+                      />
+                    ) : null}
                   </div>
-                )}
-              </div>
-            )
-          })}
+
+                  {swipedExerciseId === exercise.id && !isWarmup && (
+                    <div
+                      className="absolute right-0 top-0 h-full w-20 bg-[#ff2f00] flex items-center justify-center"
+                      onClick={() => handleDeleteExercise(exercise.id)}
+                    >
+                      <Trash2 className="w-6 h-6 text-[#ffffff]" />
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
         </div>
 
         <div className="fixed bottom-[10px] left-0 right-0 flex justify-center pointer-events-none z-50">
@@ -242,18 +388,22 @@ export default function StartWorkout() {
             <div className="space-y-3">
               <button
                 onClick={() => {
+                  if (isStartDisabled) return
                   // Очищаем предыдущее состояние тренировки
                   localStorage.removeItem("workoutState")
                   
                   // Сохраняем данные о новой тренировке в localStorage
-                  const warmupExercise = activePresetData?.exercises.find((ex) => ex.name === "warm up")
+                  const warmupExercise = activePresetData?.exercises.find((ex) => ex.warmupTime !== undefined)
                   const warmupMinutes = warmupExercise?.warmupTime
                     ? parseInt(warmupExercise.warmupTime.split(":")[0])
                     : 10
                   localStorage.setItem("workoutWarmupMinutes", warmupMinutes.toString())
                   window.location.href = "/workout/1"
                 }}
-                className="w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90 transition-opacity"
+                disabled={isStartDisabled}
+                className={`w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal transition-opacity ${
+                  isStartDisabled ? "opacity-40 cursor-not-allowed" : "hover:opacity-90"
+                }`}
               >
                 start
               </button>

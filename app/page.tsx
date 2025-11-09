@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { ExerciseRecord, Exercise } from "@/lib/types/database"
 
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
-const MONTHS_TO_SHOW = 12
+const LOOKBACK_DAYS = 14
 
 const formatDateKey = (date: Date) => {
   const year = date.getFullYear()
@@ -16,48 +16,47 @@ const formatDateKey = (date: Date) => {
   return `${year}-${month}-${day}`
 }
 
-function generateContinuousDates(monthsToShow: number, workoutDays: Set<string>, extraWeeksAfterToday = 2) {
-  const today = new Date()
-  const currentYear = today.getFullYear()
-  const currentMonth = today.getMonth()
-  const currentDate = today.getDate()
+const normalizeDate = (date: Date) => {
+  const normalized = new Date(date)
+  normalized.setHours(0, 0, 0, 0)
+  return normalized
+}
 
-  const allDates = []
-  let lastActualDate: Date | null = null
+function generateContinuousDates(startDate: Date, workoutDays: Set<string>, extraWeeksAfterToday = 2) {
+  const today = normalizeDate(new Date())
+  const normalizedStart = normalizeDate(startDate > today ? today : startDate)
+
+  const allDates: any[] = []
 
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-  for (let i = monthsToShow - 1; i >= 0; i--) {
-    const monthDate = new Date(currentYear, currentMonth - i, 1)
-    const year = monthDate.getFullYear()
-    const month = monthDate.getMonth()
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
+  let cursor = new Date(normalizedStart)
 
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateObj = new Date(year, month, day)
-      const isToday = year === currentYear && month === currentMonth && day === currentDate
-      const isPast = dateObj < today
-      const isFuture = dateObj > today
-      const dateKey = formatDateKey(dateObj)
-      const hasWorkout = workoutDays.has(dateKey) && (isPast || isToday)
-      const isFirstOfMonth = day === 1
+  while (cursor <= today) {
+    const year = cursor.getFullYear()
+    const month = cursor.getMonth()
+    const day = cursor.getDate()
+    const isToday = cursor.getTime() === today.getTime()
+    const isPast = cursor < today
+    const isFuture = cursor > today
+    const dateKey = formatDateKey(cursor)
+    const hasWorkout = workoutDays.has(dateKey) && (isPast || isToday)
+    const isFirstOfMonth = day === 1
 
-      allDates.push({
-        date: day,
-        active: hasWorkout,
-        today: isToday,
-        isFuture,
-        isFirstOfMonth,
-        monthAbbr: monthNames[month],
-        fullDate: dateKey,
-      })
+    allDates.push({
+      date: day,
+      active: hasWorkout,
+      today: isToday,
+      isFuture,
+      isFirstOfMonth,
+      monthAbbr: monthNames[month],
+      fullDate: dateKey,
+    })
 
-      lastActualDate = dateObj
-    }
+    cursor.setDate(cursor.getDate() + 1)
   }
 
-  const firstDate = new Date(currentYear, currentMonth - (monthsToShow - 1), 1)
-  const firstDayOfWeek = firstDate.getDay()
+  const firstDayOfWeek = normalizedStart.getDay()
   const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
 
   for (let i = 0; i < offset; i++) {
@@ -66,7 +65,7 @@ function generateContinuousDates(monthsToShow: number, workoutDays: Set<string>,
 
   const todayIndex = allDates.findIndex((d: any) => d.today)
 
-  if (todayIndex !== -1 && lastActualDate) {
+  if (todayIndex !== -1) {
     const todayRow = Math.floor(todayIndex / 7)
     let totalRows = Math.ceil(allDates.length / 7)
     let rowsAfterToday = totalRows - todayRow - 1
@@ -76,33 +75,24 @@ function generateContinuousDates(monthsToShow: number, workoutDays: Set<string>,
       const daysToAdd = missingRows * 7
 
       for (let i = 1; i <= daysToAdd; i++) {
-        const futureDate = new Date(lastActualDate)
+        const futureDate = new Date(today)
         futureDate.setDate(futureDate.getDate() + i)
 
         const year = futureDate.getFullYear()
         const month = futureDate.getMonth()
         const day = futureDate.getDate()
-
-        const isToday = year === currentYear && month === currentMonth && day === currentDate
-        const isPast = futureDate < today
-        const isFuture = futureDate > today
         const dateKey = formatDateKey(futureDate)
-        const hasWorkout = workoutDays.has(dateKey) && (isPast || isToday)
         const isFirstOfMonth = day === 1
 
         allDates.push({
           date: day,
-          active: hasWorkout,
-          today: isToday,
-          isFuture,
+          active: false,
+          today: false,
+          isFuture: true,
           isFirstOfMonth,
           monthAbbr: monthNames[month],
           fullDate: dateKey,
         })
-      }
-
-      if (lastActualDate) {
-        lastActualDate.setDate(lastActualDate.getDate() + missingRows * 7)
       }
 
       totalRows = Math.ceil(allDates.length / 7)
@@ -171,7 +161,12 @@ const formatRecordValue = (record: ExerciseRecordWithExercise) => {
 }
 
 export default function WorkoutTracker() {
-  const [calendarDates, setCalendarDates] = useState<any[]>(() => generateContinuousDates(MONTHS_TO_SHOW, new Set()))
+  const [calendarDates, setCalendarDates] = useState<any[]>(() => {
+    const today = normalizeDate(new Date())
+    const initialStart = new Date(today)
+    initialStart.setDate(initialStart.getDate() - LOOKBACK_DAYS)
+    return generateContinuousDates(initialStart, new Set())
+  })
   const [records, setRecords] = useState<ExerciseRecordWithExercise[]>([])
   const [calendarLoading, setCalendarLoading] = useState(true)
   const [recordsLoading, setRecordsLoading] = useState(true)
@@ -205,8 +200,7 @@ export default function WorkoutTracker() {
 
     const fetchData = async () => {
       const supabase = createClient()
-      const today = new Date()
-      const calendarStart = new Date(today.getFullYear(), today.getMonth() - (MONTHS_TO_SHOW - 1), 1)
+      const today = normalizeDate(new Date())
       const calendarEnd = new Date(today)
       calendarEnd.setHours(23, 59, 59, 999)
 
@@ -215,6 +209,31 @@ export default function WorkoutTracker() {
       setRecordsLoading(true)
 
       try {
+        const earliestSessionResult = await supabase
+          .from("workout_sessions")
+          .select("started_at")
+          .eq("user_id", TEST_USER_ID)
+          .order("started_at", { ascending: true })
+          .limit(1)
+          .returns<Array<Pick<WorkoutSessionDateRow, "started_at">>>()
+
+        if (earliestSessionResult.error) {
+          throw earliestSessionResult.error
+        }
+
+        const earliestSession = earliestSessionResult.data?.[0] ?? null
+
+        let baseStartDate = today
+        if (earliestSession?.started_at) {
+          const parsedEarliest = new Date(earliestSession.started_at)
+          if (!Number.isNaN(parsedEarliest.getTime())) {
+            baseStartDate = normalizeDate(parsedEarliest)
+          }
+        }
+
+        const calendarStart = new Date(baseStartDate)
+        calendarStart.setDate(calendarStart.getDate() - LOOKBACK_DAYS)
+
         const [sessionsResult, recordsResult] = await Promise.all([
           supabase
             .from("workout_sessions")
@@ -252,7 +271,7 @@ export default function WorkoutTracker() {
 
         if (!isMounted) return
 
-        setCalendarDates(generateContinuousDates(MONTHS_TO_SHOW, workoutDays))
+        setCalendarDates(generateContinuousDates(calendarStart, workoutDays))
         setRecords(recordsResult.data ?? [])
       } catch (error) {
         console.error("Ошибка загрузки данных дашборда:", error)
