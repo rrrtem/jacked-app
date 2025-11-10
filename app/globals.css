@@ -129,6 +129,25 @@
   body {
     @apply bg-background text-foreground lowercase;
   }
+  
+  /* Все экраны должны иметь минимальную высоту 100vh */
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: 100dvh; /* Динамическая высота viewport для мобильных */
+  }
+}
+
+/* Уменьшенное межстрочное расстояние для заголовков упражнений */
+.exercise-title-group {
+  line-height: 90%;
+}
+
+.exercise-title-group > * {
+  line-height: 90%;
+}
+
+.exercise-title-group > *:not(:first-child) {
+  margin-top: -0.15em; /* Дополнительно сближаем строки */
 }
 
 /* Custom scrollbar styles for calendar */

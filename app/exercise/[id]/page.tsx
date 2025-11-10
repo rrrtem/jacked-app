@@ -1,6 +1,6 @@
 export default function ExercisePage({ params }: { params: { id: string } }) {
   return (
-    <div className="min-h-screen bg-[#ffffff] flex items-center justify-center p-[10px]">
+    <div className="min-h-screen bg-[#ffffff] flex justify-center p-[10px]">
       <div className="w-full max-w-md">
         <h1 className="text-[32px] leading-[120%] font-normal text-[#000000] mb-8">Exercise Details</h1>
         <p className="text-[20px] leading-[120%] text-[#000000]">Exercise ID: {params.id}</p>

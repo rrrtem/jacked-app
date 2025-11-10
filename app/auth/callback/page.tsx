@@ -25,7 +25,7 @@ function AuthCallbackContent() {
   const router = useRouter()
   const params = useSearchParams()
   const [status, setStatus] = useState<"pending" | "success" | "error">("pending")
-  const [message, setMessage] = useState("Подтверждаем вход...")
+  const [message, setMessage] = useState("Confirming login...")
 
   const redirectTarget = useMemo(() => {
     const raw = params.get("redirectTo")
@@ -46,12 +46,12 @@ function AuthCallbackContent() {
     const finalize = () => {
       if (!isActive) return
       setStatus("success")
-      setMessage("Готово! Перенаправляем...")
+      setMessage("Done! Redirecting...")
       router.replace(redirectTarget)
     }
 
     if (typeof window === "undefined") {
-      handleError("Авторизация недоступна в текущей среде.")
+      handleError("Authorization is not available in the current environment.")
       return
     }
 
@@ -63,48 +63,46 @@ function AuthCallbackContent() {
 
     const process = async () => {
       setStatus("pending")
-      setMessage("Подтверждаем вход...")
+      setMessage("Confirming login...")
 
       try {
-        // Получаем код из URL параметров
-        const code = params.get("code")
+        // Проверяем наличие ошибок в URL
+        const error = params.get("error")
+        const errorDescription = params.get("error_description")
         
-        if (!code) {
-          // Если нет кода, пробуем получить сессию напрямую (для magic link)
-          const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-          
-          if (!isActive) return
-
-          if (sessionError || !sessionData.session) {
-            console.error("[AuthCallback] no code and no session:", sessionError)
-            handleError("Сессия не найдена. Отправьте ссылку ещё раз.")
-            return
-          }
-
-          finalize()
+        if (error || errorDescription) {
+          console.error("[AuthCallback] URL error:", error, errorDescription)
+          handleError(errorDescription || error || "Authentication failed")
           return
         }
 
-        // Обмениваем код на сессию
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+        // Для implicit flow токены обрабатываются автоматически из URL hash
+        // Ждем небольшое время, чтобы Supabase успел обработать токены
+        await new Promise(resolve => setTimeout(resolve, 500))
 
+        // Проверяем есть ли активная сессия
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        
         if (!isActive) return
 
-        if (error) {
-          console.error("[AuthCallback] exchangeCodeForSession error:", error)
-          handleError(error.message ?? "Не удалось подтвердить сессию. Попробуйте снова.")
+        if (sessionError) {
+          console.error("[AuthCallback] session error:", sessionError)
+          handleError(sessionError.message || "Failed to get session")
           return
         }
 
-        if (!data.session) {
-          handleError("Сессия не найдена. Отправьте ссылку ещё раз.")
+        if (!sessionData.session) {
+          console.error("[AuthCallback] no session found")
+          handleError("Session not found. Please request a new magic link.")
           return
         }
 
+        console.log("[AuthCallback] session confirmed:", sessionData.session.user.email)
         finalize()
       } catch (err) {
         console.error("[AuthCallback] unexpected error:", err)
-        handleError("Не удалось подтвердить сессию. Попробуйте снова.")
+        if (!isActive) return
+        handleError("Failed to confirm session. Please try again.")
       }
     }
 
@@ -126,7 +124,7 @@ function AuthCallbackContent() {
         <div className="text-[18px] leading-[130%] text-[#000000]">{message}</div>
         {status === "error" && (
           <div className="text-[14px] leading-[130%] text-[rgba(0,0,0,0.6)]">
-            Если проблема повторяется, запросите ссылку заново или выберите другой способ входа.
+            If the problem persists, request the link again or choose another login method.
           </div>
         )}
       </div>
@@ -141,7 +139,7 @@ export default function AuthCallback() {
         <div className="min-h-screen flex items-center justify-center bg-[#ffffff] px-6">
           <div className="flex items-center gap-3 text-[16px] leading-[140%] text-[rgba(0,0,0,0.6)]">
             <Loader2 className="w-5 h-5 animate-spin text-[#000000]" />
-            Готовим страницу авторизации...
+            Preparing authorization page...
           </div>
         </div>
       }

@@ -290,9 +290,9 @@ export default function WorkoutTracker() {
         setCalendarDates(generateContinuousDates(calendarStart, workoutDays))
         setRecords(recordsResult.data ?? [])
       } catch (error) {
-        console.error("Ошибка загрузки данных дашборда:", error)
+        console.error("Dashboard data loading error:", error)
         if (isMounted) {
-          setFetchError("Не удалось загрузить данные. Попробуйте обновить страницу.")
+          setFetchError("Failed to load data. Please refresh the page.")
         }
       } finally {
         if (isMounted) {
@@ -322,7 +322,7 @@ export default function WorkoutTracker() {
   const daysOfWeek = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
   return (
-    <div className="min-h-screen bg-[#ffffff] flex items-center justify-center p-[10px]">
+    <div className="min-h-screen bg-[#ffffff] flex justify-center p-[10px]">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -423,7 +423,7 @@ export default function WorkoutTracker() {
             ))
           ) : (
             <div className="py-6 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.5)]">
-              Нет сохранённых рекордов
+              No saved records
             </div>
           )}
         </div>

@@ -37,6 +37,11 @@ export default function StartWorkout() {
   const [editingWarmupId, setEditingWarmupId] = useState<string | null>(null)
   const [warmupInputValue, setWarmupInputValue] = useState<string>("")
   const warmupInputRef = useRef<HTMLInputElement | null>(null)
+  
+  // Состояния для добавления упражнений
+  const [showExerciseList, setShowExerciseList] = useState(false)
+  const [availableExercises, setAvailableExercises] = useState<any[]>([])
+  const [loadingExercises, setLoadingExercises] = useState(false)
 
   const supabaseClientRef = useRef(createClient())
 
@@ -54,8 +59,7 @@ export default function StartWorkout() {
             const normalizedName = exerciseName.trim().toLowerCase()
             const isWarmup =
               normalizedName === "workout" ||
-              normalizedName.includes("warm") ||
-              normalizedName.includes("размин")
+              normalizedName.includes("warm")
             const displayName = normalizedName === "workout" ? "warm up" : exerciseName
 
             return {
@@ -144,7 +148,7 @@ export default function StartWorkout() {
           if (isMounted) {
             setPresets([])
             setActivePreset(null)
-            setError("Чтобы увидеть свои шаблоны, войдите в аккаунт.")
+            setError("Please sign in to see your templates.")
           }
           return
         }
@@ -153,7 +157,7 @@ export default function StartWorkout() {
       } catch (err) {
         console.error(err)
         if (isMounted) {
-          setError("Не удалось загрузить шаблоны тренировок. Попробуйте позже.")
+          setError("Failed to load workout templates. Please try again later.")
         }
       } finally {
         if (isMounted) {
@@ -172,7 +176,7 @@ export default function StartWorkout() {
       if (!session?.user) {
         setPresets([])
         setActivePreset(null)
-        setError("Чтобы увидеть свои шаблоны, войдите в аккаунт.")
+        setError("Please sign in to see your templates.")
         setLoading(false)
         return
       }
@@ -181,7 +185,7 @@ export default function StartWorkout() {
       loadSetsForUser(session.user.id)
         .catch((err) => {
           console.error(err)
-          setError("Не удалось загрузить шаблоны тренировок. Попробуйте позже.")
+          setError("Failed to load workout templates. Please try again later.")
         })
         .finally(() => {
           if (isMounted) {
@@ -235,25 +239,77 @@ export default function StartWorkout() {
     const touchCurrent = e.touches[0].clientX
     const diff = touchStart - touchCurrent
 
-    // Only allow left swipe (positive diff), max 80px
+    // Only allow left swipe (positive diff), max 100px
     if (diff > 0) {
-      setSwipeDistance(Math.min(diff, 80))
+      setSwipeDistance(Math.min(diff, 100))
+    } else if (diff < 0) {
+      // Allow swipe back to close
+      setSwipeDistance(Math.max(0, swipeDistance + diff * 0.5))
     }
   }
 
   const handleTouchEnd = (e: React.TouchEvent, exerciseId: string, isWarmup: boolean) => {
     if (isWarmup || touchStart === null) return
 
-    // If swiped more than 60px (reaching trash icon), delete
-    if (swipeDistance > 60) {
+    // If swiped more than 80px (fully revealed), delete
+    if (swipeDistance >= 80) {
       handleDeleteExercise(exerciseId)
     } else {
-      // Otherwise reset
+      // Otherwise reset with animation
       setSwipeDistance(0)
       setSwipedExerciseId(null)
     }
 
     setTouchStart(null)
+  }
+  
+  // Загрузка списка всех упражнений
+  const loadAvailableExercises = async () => {
+    if (loadingExercises) return
+    
+    setLoadingExercises(true)
+    try {
+      const supabase = supabaseClientRef.current
+      const { data, error } = await supabase
+        .from("exercises")
+        .select("id, name, instructions, tags")
+        .order("name")
+      
+      if (error) throw error
+      
+      setAvailableExercises(data || [])
+      setShowExerciseList(true)
+    } catch (err) {
+      console.error("Error loading exercises:", err)
+    } finally {
+      setLoadingExercises(false)
+    }
+  }
+  
+  // Добавление упражнения в текущий preset
+  const handleAddExercise = (exercise: any) => {
+    if (!activePreset) return
+    
+    const newExercise: Exercise = {
+      id: `temp-${Date.now()}`, // Временный ID для UI
+      exerciseId: exercise.id,
+      name: exercise.name,
+      sets: null,
+      tags: Array.isArray(exercise.tags) ? exercise.tags : null,
+    }
+    
+    setPresets((prev) =>
+      prev.map((preset) =>
+        preset.id === activePreset
+          ? {
+              ...preset,
+              exercises: [...preset.exercises, newExercise],
+            }
+          : preset,
+      ),
+    )
+    
+    setShowExerciseList(false)
   }
 
   const handleWarmupFocus = (exerciseId: string, currentTime: string) => {
@@ -331,7 +387,7 @@ export default function StartWorkout() {
         <div className="space-y-0 mb-[200px] border-t border-[rgba(0,0,0,0.1)]">
           {loading ? (
             <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
-              Загружаем шаблоны...
+              Loading templates...
             </div>
           ) : error ? (
             <div className="py-12 text-center text-[16px] leading-[140%] text-[#ff2f00]">
@@ -339,56 +395,108 @@ export default function StartWorkout() {
             </div>
           ) : !activePresetData ? (
             <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
-              Шаблоны не найдены. Создайте новый сет в приложении.
+              No templates found. Create a new set in the app.
             </div>
           ) : activePresetData.exercises.length === 0 ? (
-            <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
-              В этом шаблоне пока нет упражнений.
-            </div>
+            <>
+              <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
+                No exercises in this template yet.
+              </div>
+              
+              {/* Кнопка добавления упражнения */}
+              <button
+                onClick={loadAvailableExercises}
+                disabled={loadingExercises}
+                className="flex items-center justify-between py-5 border-b border-[rgba(0,0,0,0.1)] bg-[#ffffff] w-full text-left hover:bg-[#f7f7f7] transition-colors disabled:opacity-50"
+              >
+                <span className="text-[20px] leading-[120%] text-[rgba(0,0,0,0.5)]">
+                  {loadingExercises ? "Loading..." : "+ add exercise"}
+                </span>
+              </button>
+            </>
           ) : (
-            activePresetData.exercises.map((exercise) => {
-              const isWarmup = exercise.warmupTime !== undefined
-              return (
-                <div
-                  key={exercise.id}
-                  className="relative overflow-hidden"
-                  onTouchStart={(e) => handleTouchStart(e, exercise.id, isWarmup)}
-                  onTouchMove={(e) => handleTouchMove(e, exercise.id, isWarmup)}
-                  onTouchEnd={(e) => handleTouchEnd(e, exercise.id, isWarmup)}
-                >
+            <>
+              {activePresetData.exercises.map((exercise) => {
+                const isWarmup = exercise.warmupTime !== undefined
+                const currentSwipe = swipedExerciseId === exercise.id ? swipeDistance : 0
+                
+                return (
                   <div
-                    className="flex items-center justify-between py-5 border-b border-[rgba(0,0,0,0.1)] bg-[#ffffff] transition-transform"
-                    style={{
-                      transform: swipedExerciseId === exercise.id ? `translateX(-${swipeDistance}px)` : "translateX(0)",
-                    }}
+                    key={exercise.id}
+                    className="relative overflow-hidden border-b border-[rgba(0,0,0,0.1)] group"
+                    onTouchStart={(e) => handleTouchStart(e, exercise.id, isWarmup)}
+                    onTouchMove={(e) => handleTouchMove(e, exercise.id, isWarmup)}
+                    onTouchEnd={(e) => handleTouchEnd(e, exercise.id, isWarmup)}
                   >
-                    <span className="text-[20px] leading-[120%] text-[#000000]">{exercise.name}</span>
-                    {isWarmup ? (
-                      <input
-                        ref={warmupInputRef}
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={editingWarmupId === exercise.id ? warmupInputValue : exercise.warmupTime || "10:00"}
-                        onChange={handleWarmupChange}
-                        onFocus={() => handleWarmupFocus(exercise.id, exercise.warmupTime || "10:00")}
-                        onBlur={() => handleWarmupBlur(exercise.id)}
-                        className="text-[20px] leading-[120%] text-[#000000] bg-transparent outline-none text-right w-[80px]"
-                      />
-                    ) : null}
-                  </div>
-
-                  {swipedExerciseId === exercise.id && !isWarmup && (
+                    {/* Красная кнопка удаления позади (swipe на мобиле) */}
+                    {!isWarmup && (
+                      <div 
+                        className="absolute right-0 top-0 h-full bg-[#ff2f00] flex items-center justify-center transition-all"
+                        style={{
+                          width: `${currentSwipe}px`,
+                          opacity: Math.min(currentSwipe / 80, 1),
+                        }}
+                      >
+                        <Trash2 
+                          className="w-6 h-6 text-[#ffffff]"
+                          style={{
+                            opacity: Math.min(currentSwipe / 60, 1),
+                            transform: `scale(${Math.min(currentSwipe / 80, 1)})`,
+                          }}
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Строка упражнения */}
                     <div
-                      className="absolute right-0 top-0 h-full w-20 bg-[#ff2f00] flex items-center justify-center"
-                      onClick={() => handleDeleteExercise(exercise.id)}
+                      className="flex items-center justify-between py-5 bg-[#ffffff] relative z-10"
+                      style={{
+                        transform: `translateX(-${currentSwipe}px)`,
+                        transition: touchStart === null ? 'transform 0.3s ease-out' : 'none',
+                      }}
                     >
-                      <Trash2 className="w-6 h-6 text-[#ffffff]" />
+                      <span className="text-[20px] leading-[120%] text-[#000000]">{exercise.name}</span>
+                      
+                      <div className="flex items-center gap-3">
+                        {isWarmup ? (
+                          <input
+                            ref={warmupInputRef}
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={editingWarmupId === exercise.id ? warmupInputValue : exercise.warmupTime || "10:00"}
+                            onChange={handleWarmupChange}
+                            onFocus={() => handleWarmupFocus(exercise.id, exercise.warmupTime || "10:00")}
+                            onBlur={() => handleWarmupBlur(exercise.id)}
+                            className="text-[20px] leading-[120%] text-[#000000] bg-transparent outline-none text-right w-[80px]"
+                          />
+                        ) : (
+                          /* Иконка удаления по hover на десктопе */
+                          <button
+                            onClick={() => handleDeleteExercise(exercise.id)}
+                            className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-[rgba(255,47,0,0.1)] rounded-lg"
+                            aria-label="Delete exercise"
+                          >
+                            <Trash2 className="w-5 h-5 text-[#ff2f00]" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              )
-            })
+                  </div>
+                )
+              })}
+              
+              {/* Кнопка добавления упражнения */}
+              <button
+                onClick={loadAvailableExercises}
+                disabled={loadingExercises}
+                className="flex items-center justify-between py-5 border-b border-[rgba(0,0,0,0.1)] bg-[#ffffff] w-full text-left hover:bg-[#f7f7f7] transition-colors disabled:opacity-50"
+              >
+                <span className="text-[20px] leading-[120%] text-[rgba(0,0,0,0.5)]">
+                  {loadingExercises ? "Loading..." : "+ add exercise"}
+                </span>
+              </button>
+            </>
           )}
         </div>
 
@@ -445,6 +553,58 @@ export default function StartWorkout() {
             </div>
           </div>
         </div>
+
+        {/* Модальное окно со списком упражнений */}
+        {showExerciseList && (
+          <>
+            <div 
+              className="fixed inset-0 bg-[rgba(0,0,0,0.3)] z-[60]" 
+              onClick={() => setShowExerciseList(false)} 
+            />
+            <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#ffffff] rounded-t-[30px] shadow-2xl animate-slide-up max-h-[80vh] flex flex-col">
+              <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
+                {/* Заголовок */}
+                <div className="flex items-center justify-between p-6 border-b border-[rgba(0,0,0,0.1)]">
+                  <h2 className="text-[24px] leading-[120%] font-normal text-[#000000]">
+                    Add Exercise
+                  </h2>
+                  <button 
+                    onClick={() => setShowExerciseList(false)}
+                    className="p-2 hover:bg-[#f7f7f7] rounded-lg transition-colors"
+                  >
+                    <X className="w-6 h-6 text-[#000000]" />
+                  </button>
+                </div>
+                
+                {/* Список упражнений */}
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                  {availableExercises.length === 0 ? (
+                    <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.5)]">
+                      No exercises found
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableExercises.map((exercise) => (
+                        <button
+                          key={exercise.id}
+                          onClick={() => handleAddExercise(exercise)}
+                          className="w-full bg-[#ffffff] text-left py-4 px-6 rounded-[20px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.02)]"
+                        >
+                          <div className="font-normal text-[#000000]">{exercise.name}</div>
+                          {exercise.instructions && (
+                            <div className="text-[16px] text-[rgba(0,0,0,0.5)] mt-1 line-clamp-2">
+                              {exercise.instructions}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {showAdjustOverlay && (
           <>

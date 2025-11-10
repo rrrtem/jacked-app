@@ -694,7 +694,7 @@ export default function WorkoutSession() {
   const canShuffleWarmup = warmupExercisesPool.length > (warmupExercise ? 1 : 0)
   const warmupDetailsText = warmupExercise
     ? `${warmupExercise.name}${warmupExercise.instructions ? `\n${warmupExercise.instructions}` : ""}`
-    : "Warm-up упражнение не найдено"
+    : "Warm-up exercise not found"
 
   const resetInputsToZero = () => {
     setWeight("0")
@@ -1226,11 +1226,11 @@ export default function WorkoutSession() {
             </div>
           </div>
 
-          <div className="mb-8">
-            <h1 className="text-[60px] leading-[110%] font-normal text-[#000000]">
+          <div className="mb-8 exercise-title-group">
+            <h1 className="text-[60px] font-normal text-[#000000]">
               {currentExerciseData.name}
             </h1>
-            <p className="text-[60px] leading-[110%] font-normal text-[#ff2f00]">×{currentSet}</p>
+            <p className="text-[60px] font-normal text-[#ff2f00]">×{currentSet}</p>
           </div>
 
           {currentExerciseData.instructions && (
@@ -1297,11 +1297,11 @@ export default function WorkoutSession() {
             </div>
           </div>
 
-          <div className="mb-8">
-            <h1 className="text-[60px] leading-[110%] font-normal text-[#000000]">
+          <div className="mb-8 exercise-title-group">
+            <h1 className="text-[60px] font-normal text-[#000000]">
               {currentExerciseData.name}
             </h1>
-            <p className="text-[60px] leading-[110%] font-normal text-[#ff2f00]">×{currentSet}</p>
+            <p className="text-[60px] font-normal text-[#ff2f00]">×{currentSet}</p>
           </div>
 
           {currentExerciseData.instructions && (
@@ -1338,14 +1338,14 @@ export default function WorkoutSession() {
 
             <div className="mb-8">
               <h1 className="text-[60px] leading-[110%] font-normal text-[#000000]">
-                Упражнения
+                Exercises
               </h1>
             </div>
 
             <div className="flex-1 overflow-y-auto mb-4">
               {isLoadingExercises ? (
                 <div className="text-center text-[20px] text-[rgba(0,0,0,0.3)]">
-                  Загрузка...
+                  Loading...
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1383,7 +1383,7 @@ export default function WorkoutSession() {
 
           <div className="mb-8">
             <h1 className="text-[60px] leading-[110%] font-normal text-[#000000]">
-              Что дальше?
+              What's next?
             </h1>
           </div>
 
@@ -1409,13 +1409,13 @@ export default function WorkoutSession() {
                     isLoadingExercises ? "opacity-60 cursor-not-allowed" : ""
                   }`}
                 >
-                  {isLoadingExercises ? "Загрузка..." : "добавить упражнение"}
+                  {isLoadingExercises ? "Loading..." : "add exercise"}
                 </button>
                 <button
                   onClick={finishWorkout}
                   className="w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90"
                 >
-                  закончить тренировку
+                  finish workout
                 </button>
               </div>
             </div>

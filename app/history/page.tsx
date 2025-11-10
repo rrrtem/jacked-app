@@ -99,8 +99,8 @@ export default function HistoryPage() {
 
         setWorkouts(workoutsWithDetails as WorkoutWithDetails[])
       } catch (err) {
-        console.error("Ошибка загрузки истории тренировок:", err)
-        setError("Не удалось загрузить историю тренировок")
+        console.error("Error loading workout history:", err)
+        setError("Failed to load workout history")
       } finally {
         setLoading(false)
       }
@@ -113,7 +113,7 @@ export default function HistoryPage() {
     e.preventDefault() // Предотвращаем переход по ссылке
     e.stopPropagation()
 
-    if (!confirm("Вы уверены, что хотите удалить эту тренировку?")) {
+    if (!confirm("Are you sure you want to delete this workout?")) {
       return
     }
 
@@ -122,8 +122,8 @@ export default function HistoryPage() {
       await deleteWorkoutSession(sessionId)
       setWorkouts((prev) => prev.filter((w) => w.id !== sessionId))
     } catch (err) {
-      console.error("Ошибка удаления тренировки:", err)
-      alert("Не удалось удалить тренировку")
+      console.error("Error deleting workout:", err)
+      alert("Failed to delete workout")
     } finally {
       setDeletingId(null)
     }
@@ -140,10 +140,10 @@ export default function HistoryPage() {
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return "—"
     const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes} мин`
+    if (minutes < 60) return `${minutes} min`
     const hours = Math.floor(minutes / 60)
     const remainingMinutes = minutes % 60
-    return `${hours}ч ${remainingMinutes}м`
+    return `${hours}h ${remainingMinutes}m`
   }
 
   const formatWeight = (weight: number | null) => {
@@ -156,7 +156,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#ffffff] flex items-center justify-center p-[10px]">
+    <div className="min-h-screen bg-[#ffffff] flex justify-center p-[10px]">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="flex items-center mb-8">
@@ -167,7 +167,7 @@ export default function HistoryPage() {
             <ArrowLeft className="w-6 h-6 text-[#000000]" />
           </Link>
           <h1 className="text-[32px] leading-[120%] font-normal text-[#000000]">
-            история
+            history
           </h1>
         </div>
 
@@ -193,10 +193,10 @@ export default function HistoryPage() {
           ) : workouts.length === 0 ? (
             <div className="py-12 text-center">
               <p className="text-[20px] leading-[120%] text-[rgba(0,0,0,0.5)] mb-2">
-                Пока нет тренировок
+                No workouts yet
               </p>
               <p className="text-[16px] leading-[140%] text-[rgba(0,0,0,0.3)]">
-                Начните свою первую тренировку
+                Start your first workout
               </p>
             </div>
           ) : (
@@ -219,16 +219,12 @@ export default function HistoryPage() {
                       <div className="text-[16px] leading-[140%] text-[rgba(0,0,0,0.5)]">
                         {workout.exercises.length}{" "}
                         {workout.exercises.length === 1
-                          ? "упражнение"
-                          : workout.exercises.length < 5
-                          ? "упражнения"
-                          : "упражнений"}{" "}
+                          ? "exercise"
+                          : "exercises"}{" "}
                         · {totalSets}{" "}
                         {totalSets === 1
-                          ? "подход"
-                          : totalSets < 5
-                          ? "подхода"
-                          : "подходов"}{" "}
+                          ? "set"
+                          : "sets"}{" "}
                         · {formatDuration(workout.duration)}
                       </div>
                       
@@ -240,7 +236,7 @@ export default function HistoryPage() {
                             className="text-[12px] leading-[140%] text-[rgba(0,0,0,0.4)]"
                           >
                             <span className="font-medium">
-                              {idx + 1}. {exercise.exercise?.name || "Упражнение"}:
+                              {idx + 1}. {exercise.exercise?.name || "Exercise"}:
                             </span>{" "}
                             {exercise.sets && exercise.sets.length > 0 ? (
                               exercise.sets
@@ -248,20 +244,20 @@ export default function HistoryPage() {
                                   const parts = []
                                   const weight = formatWeight(set.weight)
                                   if (weight) {
-                                    parts.push(`${weight}кг`)
+                                    parts.push(`${weight}kg`)
                                   }
                                   if (set.reps) {
                                     parts.push(`×${set.reps}`)
                                   }
                                   if (set.duration) {
-                                    parts.push(`${set.duration}с`)
+                                    parts.push(`${set.duration}s`)
                                   }
                                   return parts.length > 0 ? parts.join(" ") : "—"
                                 })
                                 .join(", ")
                             ) : (
                               <span className="text-[rgba(0,0,0,0.25)]">
-                                нет подходов
+                                no sets
                               </span>
                             )}
                           </div>
@@ -272,7 +268,7 @@ export default function HistoryPage() {
                       onClick={(e) => handleDelete(workout.id, e)}
                       disabled={deletingId === workout.id}
                       className="p-2 text-[rgba(0,0,0,0.3)] hover:text-[#ff2f00] hover:bg-[#ff2f00]/10 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ml-2 self-start"
-                      aria-label="Удалить тренировку"
+                      aria-label="Delete workout"
                     >
                       <Trash2
                         className={`w-5 h-5 ${
@@ -292,7 +288,7 @@ export default function HistoryPage() {
           <div className="mt-8">
             <Link href="/">
               <button className="w-full bg-[#f7f7f7] text-[#000000] py-4 rounded-[60px] text-[20px] leading-[120%] font-normal hover:bg-[#ebebeb] transition-colors">
-                назад на главную
+                back to home
               </button>
             </Link>
           </div>

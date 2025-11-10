@@ -1,12 +1,8 @@
-import { type NextRequest, NextResponse } from 'next/server';
-// import { updateSession } from '@/lib/supabase/middleware';
+import { type NextRequest } from 'next/server';
+import { updateSession } from '@/lib/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
-  // Временно отключено для тестирования UI без Supabase
-  // Раскомментируйте после настройки Supabase
-  // return await updateSession(request);
-  
-  return NextResponse.next();
+  return await updateSession(request);
 }
 
 export const config = {
