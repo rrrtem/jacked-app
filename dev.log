@@ -15,3 +15,16 @@
 Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
  GET /login 200 in 874ms (compile: 352ms, proxy.ts: 8ms, render: 515ms)
  GET / 200 in 213ms (compile: 8ms, proxy.ts: 167ms, render: 38ms)
+ ✓ Compiled in 54ms
+ GET /start 200 in 632ms (compile: 344ms, proxy.ts: 249ms, render: 39ms)
+ GET /workout/1 200 in 1163ms (compile: 729ms, proxy.ts: 350ms, render: 84ms)
+ GET /start 200 in 329ms (compile: 76ms, proxy.ts: 140ms, render: 114ms)
+ ✓ Compiled in 42ms
+ GET / 200 in 81ms (compile: 5ms, proxy.ts: 66ms, render: 10ms)
+ ✓ Compiled in 61ms
+ ✓ Compiled in 46ms
+ GET /start 200 in 311ms (compile: 125ms, proxy.ts: 135ms, render: 51ms)
+ ✓ Compiled in 24ms
+ ✓ Compiled in 147ms
+ ✓ Compiled in 56ms
+ ✓ Compiled in 21ms

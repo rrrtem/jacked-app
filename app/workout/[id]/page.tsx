@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { calculateSetSuggestion } from "@/lib/progression"
 import { getExerciseRecord } from "@/lib/supabase/queries"
 import type { SetSuggestion } from "@/lib/types/progression"
+import { ExerciseSelector } from "@/components/ExerciseSelector"
 
 type SupabaseClientType = ReturnType<typeof createClient>
 
@@ -1325,8 +1326,8 @@ export default function WorkoutSession() {
     if (showExerciseList) {
       return (
         <div className="min-h-screen bg-[#ffffff] flex flex-col p-[10px]">
-          <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
-            <div className="flex items-center justify-between mb-4 text-[16px] leading-[120%]">
+          <div className="w-full max-w-md mx-auto flex-1 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between mb-4 text-[16px] leading-[120%] flex-shrink-0">
               <span className="text-[#000000]">{formatTime(totalTime)}</span>
               <button 
                 onClick={() => setShowExerciseList(false)} 
@@ -1336,36 +1337,11 @@ export default function WorkoutSession() {
               </button>
             </div>
 
-            <div className="mb-8">
-              <h1 className="text-[60px] leading-[110%] font-normal text-[#000000]">
-                Exercises
-              </h1>
-            </div>
-
-            <div className="flex-1 overflow-y-auto mb-4">
-              {isLoadingExercises ? (
-                <div className="text-center text-[20px] text-[rgba(0,0,0,0.3)]">
-                  Loading...
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {availableExercises.map((exercise) => (
-                    <button
-                      key={exercise.id}
-                      onClick={() => addExerciseToWorkout(exercise)}
-                      className="w-full bg-[#ffffff] text-left py-4 px-6 rounded-[20px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.02)]"
-                    >
-                      <div className="font-normal text-[#000000]">{exercise.name}</div>
-                      {exercise.instructions && (
-                        <div className="text-[16px] text-[rgba(0,0,0,0.5)] mt-1 line-clamp-2">
-                          {exercise.instructions}
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <ExerciseSelector
+              exercises={availableExercises}
+              isLoading={isLoadingExercises}
+              onSelectExercise={addExerciseToWorkout}
+            />
           </div>
         </div>
       )

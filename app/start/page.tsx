@@ -8,6 +8,7 @@ import { X, Mic, Trash2 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
 import type { WorkoutSetWithExercises } from "@/lib/types/database"
+import { ExerciseSelector } from "@/components/ExerciseSelector"
 
 type Exercise = {
   id: string
@@ -42,6 +43,8 @@ export default function StartWorkout() {
   const [showExerciseList, setShowExerciseList] = useState(false)
   const [availableExercises, setAvailableExercises] = useState<any[]>([])
   const [loadingExercises, setLoadingExercises] = useState(false)
+  const [modalTouchStart, setModalTouchStart] = useState<number | null>(null)
+  const [modalSwipeDistance, setModalSwipeDistance] = useState(0)
 
   const supabaseClientRef = useRef(createClient())
 
@@ -310,6 +313,8 @@ export default function StartWorkout() {
     )
     
     setShowExerciseList(false)
+    setModalSwipeDistance(0)
+    setModalTouchStart(null)
   }
 
   const handleWarmupFocus = (exerciseId: string, currentTime: string) => {
@@ -348,6 +353,37 @@ export default function StartWorkout() {
     // Только цифры
     const value = e.target.value.replace(/\D/g, "")
     setWarmupInputValue(value)
+  }
+
+  const handleModalTouchStart = (e: React.TouchEvent) => {
+    setModalTouchStart(e.touches[0].clientY)
+  }
+
+  const handleModalTouchMove = (e: React.TouchEvent) => {
+    if (modalTouchStart === null) return
+
+    const touchCurrent = e.touches[0].clientY
+    const diff = touchCurrent - modalTouchStart
+
+    // Only allow downward swipe (positive diff)
+    if (diff > 0) {
+      setModalSwipeDistance(diff)
+    }
+  }
+
+  const handleModalTouchEnd = () => {
+    if (modalTouchStart === null) return
+
+    // If swiped more than 150px, close modal
+    if (modalSwipeDistance > 150) {
+      setShowExerciseList(false)
+      setModalSwipeDistance(0)
+    } else {
+      // Otherwise reset with animation
+      setModalSwipeDistance(0)
+    }
+
+    setModalTouchStart(null)
   }
 
 
@@ -559,48 +595,27 @@ export default function StartWorkout() {
           <>
             <div 
               className="fixed inset-0 bg-[rgba(0,0,0,0.3)] z-[60]" 
-              onClick={() => setShowExerciseList(false)} 
+              onClick={() => {
+                setShowExerciseList(false)
+                setModalSwipeDistance(0)
+              }} 
             />
-            <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#ffffff] rounded-t-[30px] shadow-2xl animate-slide-up max-h-[80vh] flex flex-col">
-              <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
-                {/* Заголовок */}
-                <div className="flex items-center justify-between p-6 border-b border-[rgba(0,0,0,0.1)]">
-                  <h2 className="text-[24px] leading-[120%] font-normal text-[#000000]">
-                    Add Exercise
-                  </h2>
-                  <button 
-                    onClick={() => setShowExerciseList(false)}
-                    className="p-2 hover:bg-[#f7f7f7] rounded-lg transition-colors"
-                  >
-                    <X className="w-6 h-6 text-[#000000]" />
-                  </button>
-                </div>
-                
-                {/* Список упражнений */}
-                <div className="flex-1 overflow-y-auto px-6 py-4">
-                  {availableExercises.length === 0 ? (
-                    <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.5)]">
-                      No exercises found
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {availableExercises.map((exercise) => (
-                        <button
-                          key={exercise.id}
-                          onClick={() => handleAddExercise(exercise)}
-                          className="w-full bg-[#ffffff] text-left py-4 px-6 rounded-[20px] text-[20px] leading-[120%] font-normal border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.02)]"
-                        >
-                          <div className="font-normal text-[#000000]">{exercise.name}</div>
-                          {exercise.instructions && (
-                            <div className="text-[16px] text-[rgba(0,0,0,0.5)] mt-1 line-clamp-2">
-                              {exercise.instructions}
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+            <div 
+              className="fixed bottom-0 left-0 right-0 z-[70] bg-[#ffffff] rounded-t-[30px] shadow-2xl animate-slide-up max-h-[80vh] flex flex-col overflow-hidden"
+              style={{
+                transform: `translateY(${modalSwipeDistance}px)`,
+                transition: modalTouchStart === null ? 'transform 0.3s ease-out' : 'none',
+              }}
+              onTouchStart={handleModalTouchStart}
+              onTouchMove={handleModalTouchMove}
+              onTouchEnd={handleModalTouchEnd}
+            >
+              <div className="w-full max-w-md mx-auto flex-1 flex flex-col overflow-hidden">
+                <ExerciseSelector
+                  exercises={availableExercises}
+                  isLoading={loadingExercises}
+                  onSelectExercise={handleAddExercise}
+                />
               </div>
             </div>
           </>
