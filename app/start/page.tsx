@@ -25,6 +25,13 @@ type Preset = {
   exercises: Exercise[]
 }
 
+type DbExercise = {
+  id: string
+  name: string
+  instructions: string | null
+  tags: string[] | null
+}
+
 export default function StartWorkout() {
   const [showAdjustOverlay, setShowAdjustOverlay] = useState(false)
   const [inputText, setInputText] = useState("")
@@ -41,7 +48,7 @@ export default function StartWorkout() {
   
   // Состояния для добавления упражнений
   const [showExerciseList, setShowExerciseList] = useState(false)
-  const [availableExercises, setAvailableExercises] = useState<any[]>([])
+  const [availableExercises, setAvailableExercises] = useState<DbExercise[]>([])
   const [loadingExercises, setLoadingExercises] = useState(false)
   const [modalTouchStart, setModalTouchStart] = useState<number | null>(null)
   const [modalSwipeDistance, setModalSwipeDistance] = useState(0)
@@ -280,7 +287,7 @@ export default function StartWorkout() {
       
       if (error) throw error
       
-      setAvailableExercises(data || [])
+      setAvailableExercises((data || []) as DbExercise[])
       setShowExerciseList(true)
     } catch (err) {
       console.error("Error loading exercises:", err)
@@ -290,7 +297,7 @@ export default function StartWorkout() {
   }
   
   // Добавление упражнения в текущий preset
-  const handleAddExercise = (exercise: any) => {
+  const handleAddExercise = (exercise: DbExercise) => {
     if (!activePreset) return
     
     const newExercise: Exercise = {
@@ -298,7 +305,7 @@ export default function StartWorkout() {
       exerciseId: exercise.id,
       name: exercise.name,
       sets: null,
-      tags: Array.isArray(exercise.tags) ? exercise.tags : null,
+      tags: exercise.tags,
     }
     
     setPresets((prev) =>

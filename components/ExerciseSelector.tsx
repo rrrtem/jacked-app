@@ -5,8 +5,8 @@ import { useState } from "react"
 type Exercise = {
   id: string
   name: string
-  instructions?: string | null
-  tags?: string[] | null
+  instructions: string | null
+  tags: string[] | null
 }
 
 type ExerciseSelectorProps = {
@@ -22,14 +22,14 @@ export function ExerciseSelector({ exercises, isLoading, onSelectExercise }: Exe
   const allTags = Array.from(
     new Set(
       exercises
-        .flatMap((ex) => ex.tags || [])
+        .flatMap((ex) => ex.tags ?? [])
         .filter((tag) => tag)
     )
   )
 
   // Фильтруем упражнения по выбранному тегу
   const filteredExercises = selectedTag
-    ? exercises.filter((exercise) => exercise.tags && exercise.tags.includes(selectedTag))
+    ? exercises.filter((exercise) => exercise.tags !== null && exercise.tags.includes(selectedTag))
     : exercises
 
   if (isLoading) {
@@ -91,7 +91,7 @@ export function ExerciseSelector({ exercises, isLoading, onSelectExercise }: Exe
                     {exercise.instructions.toLowerCase()}
                   </div>
                 )}
-                {exercise.tags && exercise.tags.length > 0 && (
+                {exercise.tags !== null && exercise.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {exercise.tags.map((tag: string) => (
                       <span
