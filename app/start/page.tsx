@@ -16,7 +16,9 @@ type Exercise = {
   name: string
   sets: number | null
   warmupTime?: string
-  tags?: string[] | null
+  exercise_type?: string
+  movement_pattern?: string
+  muscle_group?: string
 }
 
 type Preset = {
@@ -29,7 +31,9 @@ type DbExercise = {
   id: string
   name: string
   instructions: string | null
-  tags: string[] | null
+  exercise_type: string
+  movement_pattern: string
+  muscle_group: string
 }
 
 export default function StartWorkout() {
@@ -78,7 +82,9 @@ export default function StartWorkout() {
               name: displayName,
               sets: item.target_sets ?? null,
               warmupTime: isWarmup ? "10:00" : undefined,
-              tags: Array.isArray(item.exercise?.tags) ? item.exercise?.tags : null,
+              exercise_type: item.exercise?.exercise_type,
+              movement_pattern: item.exercise?.movement_pattern,
+              muscle_group: item.exercise?.muscle_group,
             }
           })
 
@@ -93,7 +99,9 @@ export default function StartWorkout() {
                 name: "warm up",
                 sets: null,
                 warmupTime: "10:00",
-                tags: null,
+                exercise_type: 'warmup',
+                movement_pattern: 'complex',
+                muscle_group: 'full_body',
               },
               ...sortedExercises,
             ]
@@ -282,7 +290,7 @@ export default function StartWorkout() {
       const supabase = supabaseClientRef.current
       const { data, error } = await supabase
         .from("exercises")
-        .select("id, name, instructions, tags")
+        .select("id, name, instructions, exercise_type, movement_pattern, muscle_group")
         .order("name")
       
       if (error) throw error
@@ -305,7 +313,9 @@ export default function StartWorkout() {
       exerciseId: exercise.id,
       name: exercise.name,
       sets: null,
-      tags: exercise.tags,
+      exercise_type: exercise.exercise_type,
+      movement_pattern: exercise.movement_pattern,
+      muscle_group: exercise.muscle_group,
     }
     
     setPresets((prev) =>
@@ -415,7 +425,7 @@ export default function StartWorkout() {
               onClick={() => setActivePreset(preset.id)}
               className={`
                 flex-shrink-0 w-14 h-14 rounded-full flex items-center justify-center
-                ${preset.id === activePreset ? "bg-[#000000] text-[#ffffff]" : "bg-[rgba(0,0,0,0.05)] text-[#000000]"}
+                ${preset.id === activePreset ? "bg-[#000000] text-[#ffffff]" : "bg-[#f7f7f7] text-[#000000]"}
                 hover:opacity-80 transition-opacity
               `}
             >
@@ -578,7 +588,9 @@ export default function StartWorkout() {
                       workoutEntryId: ex.id,
                       name: ex.name,
                       sets: ex.sets,
-                      tags: ex.tags ?? null,
+                      exercise_type: ex.exercise_type,
+                      movement_pattern: ex.movement_pattern,
+                      muscle_group: ex.muscle_group,
                     }))
                   
                   localStorage.setItem("workoutExercises", JSON.stringify(selectedExercises))

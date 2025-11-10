@@ -28,14 +28,18 @@
 | `id` | UUID | Первичный ключ |
 | `name` | TEXT | Название упражнения |
 | `instructions` | TEXT | Инструкция по выполнению |
-| `tags` | TEXT[] | Массив тегов (push, pull, legs, chest, back, biceps и т.д.) |
+| `exercise_type` | TEXT | Тип тренировки: strength, mobility, warmup, cardio, stretching |
+| `movement_pattern` | TEXT | Паттерн движения: compound (многосуставное), isolation (изолированное) |
+| `muscle_group` | TEXT | Группа мышц: chest, back, legs, shoulders, arms, core, full_body |
+| `equipment` | TEXT | Оборудование: bodyweight, barbell, dumbbell, machine, cable, kettlebell, bands |
 | `created_at` | TIMESTAMPTZ | Дата создания |
 | `updated_at` | TIMESTAMPTZ | Дата обновления |
 
-**Примеры тегов:**
-- Группы мышц: `chest`, `back`, `legs`, `biceps`, `triceps`, `shoulders`, `core`
-- Типы движений: `push`, `pull`, `full-body`, `complex`
-- Оборудование: `bodyweight`, `barbell`, `dumbbell`
+**Категории упражнений:**
+- **exercise_type**: Тип тренировки (strength, mobility, warmup, cardio, stretching)
+- **movement_pattern**: Комплексное или изолированное упражнение
+- **muscle_group**: Основная целевая группа мышц
+- **equipment**: Необходимое оборудование для выполнения
 
 ### 3. `exercise_records` - Личные рекорды пользователя
 
@@ -181,11 +185,26 @@ workout_sessions
 
 ## Примеры запросов
 
-### Получить все упражнения с тегом "chest"
+### Получить все упражнения на грудь
 
 ```sql
 SELECT * FROM exercises 
-WHERE 'chest' = ANY(tags);
+WHERE muscle_group = 'chest';
+```
+
+### Получить все комплексные упражнения со штангой
+
+```sql
+SELECT * FROM exercises 
+WHERE movement_pattern = 'compound' 
+  AND equipment = 'barbell';
+```
+
+### Получить упражнения для разминки
+
+```sql
+SELECT * FROM exercises 
+WHERE exercise_type = 'warmup';
 ```
 
 ### Получить историю тренировок пользователя за текущий месяц

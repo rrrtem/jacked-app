@@ -110,7 +110,7 @@ function generateContinuousDates(startDate: Date, workoutDays: Set<string>, extr
 }
 
 type ExerciseRecordWithExercise = ExerciseRecord & {
-  exercise: Pick<Exercise, "id" | "name" | "tags"> | null
+  exercise: Pick<Exercise, "id" | "name" | "exercise_type"> | null
 }
 
 type WorkoutSessionDateRow = {
@@ -135,8 +135,8 @@ const formatRecordValue = (record: ExerciseRecordWithExercise) => {
   const weight = formatDecimal(record.max_weight)
   const reps = record.max_reps ?? undefined
   const duration = record.max_duration ?? undefined
-  const tags = record.exercise?.tags ?? []
-  const isBarbell = tags.includes("barbell")
+  const exerciseType = record.exercise?.exercise_type ?? ''
+  const isWeight = exerciseType === 'weight'
 
   const parts: string[] = []
 
@@ -261,7 +261,7 @@ export default function WorkoutTracker() {
             .returns<WorkoutSessionDateRow[]>(),
           supabase
             .from("exercise_records")
-            .select("*, exercise:exercises(id, name, tags)")
+            .select("*, exercise:exercises(id, name, exercise_type)")
             .eq("user_id", userId)
             .order("last_updated", { ascending: false })
             .returns<ExerciseRecordWithExercise[]>(),

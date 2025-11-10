@@ -11,29 +11,26 @@ import { calculateDurationBasedSuggestion } from './duration-based'
 
 /**
  * Главная функция для расчета suggestion для текущего подхода
- * Автоматически выбирает подходящую логику прогрессии на основе тегов упражнения
+ * Автоматически выбирает подходящую логику прогрессии на основе типа упражнения
  * 
  * @param params - Параметры для расчета
  * @returns Suggestion для подхода
  */
 export function calculateSetSuggestion(params: CalculateSuggestionsParams): SetSuggestion {
-  const { exerciseTags, setNumber, record } = params
+  const { exerciseType, setNumber, record } = params
 
-  // Определяем тип упражнения по тегам
-  const hasDurationTag = exerciseTags.includes('duration')
-  const hasWeightTag = exerciseTags.includes('weight')
-
+  // Определяем тип упражнения
   // Упражнение на длительность (planks, holds и т.д.)
-  if (hasDurationTag) {
+  if (exerciseType === 'duration') {
     return calculateDurationBasedSuggestion(setNumber, record)
   }
 
   // Упражнение с весом (barbell, dumbbell и т.д.)
-  if (hasWeightTag) {
+  if (exerciseType === 'weight') {
     return calculateLinearLoadSuggestion(setNumber, record, DEFAULT_LINEAR_LOAD_CONFIG)
   }
 
-  // Упражнение без веса (bodyweight)
+  // Упражнение без веса (bodyweight) - по умолчанию
   return calculatePercentageBasedSuggestion(setNumber, record, DEFAULT_PERCENTAGE_BASED_CONFIG)
 }
 
@@ -43,7 +40,7 @@ export function calculateSetSuggestion(params: CalculateSuggestionsParams): SetS
  */
 export async function getSuggestionForExercise(
   exerciseId: string,
-  exerciseTags: string[],
+  exerciseType: string,
   setNumber: number,
   userId: string
 ): Promise<SetSuggestion> {
@@ -61,7 +58,7 @@ export async function getSuggestionForExercise(
   // Рассчитываем suggestion
   return calculateSetSuggestion({
     exerciseId,
-    exerciseTags,
+    exerciseType,
     setNumber,
     record,
   })

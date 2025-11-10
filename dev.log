@@ -34,3 +34,98 @@ Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allow
  ✓ Compiled in 18ms
  ✓ Compiled in 57ms
  ✓ Compiled in 29ms
+ ✓ Compiled in 81ms
+ ✓ Compiled in 60ms
+ ✓ Compiled in 23ms
+ ✓ Compiled in 26ms
+ ✓ Compiled in 22ms
+ ✓ Compiled in 65ms
+ ✓ Compiled in 92ms
+ ✓ Compiled in 42ms
+ ✓ Compiled in 74ms
+ ✓ Compiled in 45ms
+ ✓ Compiled in 48ms
+ ✓ Compiled in 28ms
+ ✓ Compiled in 56ms
+ ✓ Compiled in 49ms
+ GET /workout/1 200 in 1061ms (compile: 257ms, proxy.ts: 192ms, render: 612ms)
+ ✓ Compiled in 161ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 40ms
+ GET /workout/1 200 in 581ms (compile: 146ms, proxy.ts: 199ms, render: 237ms)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 40ms
+ GET /workout/1 200 in 349ms (compile: 97ms, proxy.ts: 75ms, render: 178ms)
+ ✓ Compiled in 138ms
+ ✓ Compiled in 96ms
+ ✓ Compiled in 46ms
+ ✓ Compiled in 109ms
+ ✓ Compiled in 94ms
+ ✓ Compiled in 90ms
+ GET /start 200 in 398ms (compile: 102ms, proxy.ts: 154ms, render: 141ms)
+ ✓ Compiled in 216ms
+ GET /start 200 in 327ms (compile: 6ms, proxy.ts: 305ms, render: 16ms)
+ GET /start 200 in 181ms (compile: 7ms, proxy.ts: 136ms, render: 38ms)
+ ✓ Compiled in 79ms
+ ✓ Compiled in 39ms
+ ✓ Compiled in 31ms
+ GET / 200 in 465ms (compile: 139ms, proxy.ts: 246ms, render: 80ms)
+ ✓ Compiled in 22ms
+ ✓ Compiled in 45ms
+ ✓ Compiled in 20ms
+ GET /start 200 in 522ms (compile: 103ms, proxy.ts: 360ms, render: 60ms)
+ GET / 200 in 214ms (compile: 11ms, proxy.ts: 183ms, render: 20ms)
+ ⨯ Error: The default export is not a React Component in "/workout/[id]/page"
+    at ignore-listed frames
+ ⨯ Error: The default export is not a React Component in "/workout/[id]/page"
+    at ignore-listed frames {
+  page: '/workout/1'
+}
+ GET /workout/1 500 in 1968ms (compile: 1741ms, proxy.ts: 136ms, render: 90ms)
+ GET / 200 in 225ms (compile: 9ms, proxy.ts: 105ms, render: 110ms)
+ GET /start 200 in 222ms (compile: 102ms, proxy.ts: 77ms, render: 44ms)
+ ✓ Compiled in 36ms
+ ✓ Compiled in 16ms
+ ✓ Compiled in 65ms
+ ✓ Compiled in 20ms
+ ✓ Compiled in 17ms
+ ✓ Compiled in 22ms
+ ✓ Compiled in 140ms
+ GET /start 200 in 484ms (compile: 196ms, proxy.ts: 225ms, render: 63ms)
+ ✓ Compiled in 20ms
+ ✓ Compiled in 28ms
+ ✓ Compiled in 120ms
+ ✓ Compiled in 38ms
+ ✓ Compiled in 60ms
+ ✓ Compiled in 38ms
+ ✓ Compiled in 72ms
+ ✓ Compiled in 69ms
+ ✓ Compiled in 147ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 80ms
+ GET /start 200 in 558ms (compile: 112ms, proxy.ts: 303ms, render: 143ms)
+ ✓ Compiled in 60ms
+ ✓ Compiled in 51ms
+ GET / 200 in 372ms (compile: 94ms, proxy.ts: 238ms, render: 40ms)
+ GET /history 200 in 517ms (compile: 296ms, proxy.ts: 202ms, render: 18ms)
+ GET / 200 in 123ms (compile: 8ms, proxy.ts: 88ms, render: 27ms)
+Error: Route "/exercise/[id]" used `params.id`. `params` is a Promise and must be unwrapped with `await` or `React.use()` before accessing its properties. Learn more: https://nextjs.org/docs/messages/sync-dynamic-apis
+    at ExercisePage (app/exercise/[id]/page.tsx:6:87)
+  4 |       <div className="w-full max-w-md">
+  5 |         <h1 className="text-[32px] leading-[120%] font-normal text-[#000000] mb-8">Exercise Details</h1>
+> 6 |         <p className="text-[20px] leading-[120%] text-[#000000]">Exercise ID: {params.id}</p>
+    |                                                                                       ^
+  7 |         <p className="text-[16px] leading-[120%] text-[rgba(0,0,0,0.5)] mt-4">
+  8 |           (This is a placeholder page for exercise details and history)
+  9 |         </p>
+ GET /exercise/e50525e4-373b-48c3-be3f-940da9d301e7 200 in 815ms (compile: 659ms, proxy.ts: 98ms, render: 59ms)
+ GET /start 200 in 353ms (compile: 106ms, proxy.ts: 204ms, render: 44ms)
+ GET /workout/1 200 in 436ms (compile: 117ms, proxy.ts: 161ms, render: 157ms)
+ GET /start 200 in 256ms (compile: 22ms, proxy.ts: 154ms, render: 80ms)
+ GET / 200 in 282ms (compile: 19ms, proxy.ts: 240ms, render: 22ms)
+ GET /start 200 in 362ms (compile: 13ms, proxy.ts: 334ms, render: 15ms)
+ GET /workout/1 200 in 420ms (compile: 140ms, proxy.ts: 141ms, render: 139ms)
+ ✓ Compiled in 49ms
+ ✓ Compiled in 49ms
+ ✓ Compiled in 95ms
+ GET /start 200 in 308ms (compile: 22ms, proxy.ts: 248ms, render: 39ms)

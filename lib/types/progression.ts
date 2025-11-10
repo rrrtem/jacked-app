@@ -59,7 +59,7 @@ export interface ExerciseSuggestions {
  */
 export interface CalculateSuggestionsParams {
   exerciseId: string
-  exerciseTags: string[]
+  exerciseType: string // 'weight', 'duration', 'warmup', etc.
   setNumber: number // Текущий номер подхода
   record?: ExerciseRecord | null
 }

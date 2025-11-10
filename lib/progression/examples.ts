@@ -20,25 +20,27 @@ import type { ExerciseRecord } from '@/lib/types/database'
 
 /**
  * ПРИМЕР 1: Упражнение с весом (Жим лежа)
- * Рекорд: 100 кг × 8 повторений
+ * Рекорд: 60 кг × 5 повторений
+ * Простая прогрессия с шагами +10, +5, +2.5 кг
  */
 export function exampleBenchPress() {
   const record: ExerciseRecord = {
     id: 'record-1',
     user_id: 'user-1',
     exercise_id: 'exercise-bench-press',
-    max_weight: 100,
-    max_reps: 8,
+    max_weight: 60,
+    max_reps: 5,
     max_duration: null,
     last_updated: new Date().toISOString(),
     created_at: new Date().toISOString(),
   }
 
   console.log('=== ПРИМЕР: Жим лежа (Bench Press) ===')
-  console.log('Рекорд: 100 кг × 8 повторений\n')
+  console.log('Рекорд: 60 кг × 5 повторений')
+  console.log('Цель: уложиться в 5 подходов до рабочего веса\n')
 
-  // Рассчитываем suggestions для 5 подходов
-  const suggestions = calculateAllLinearLoadSuggestions(5, record)
+  // Рассчитываем suggestions для 6 подходов
+  const suggestions = calculateAllLinearLoadSuggestions(6, record)
   
   suggestions.forEach((suggestion, index) => {
     console.log(`Подход ${index + 1}: ${suggestion.weight ?? 0} кг × ${suggestion.reps ?? 0} повторений`)
@@ -109,8 +111,8 @@ export function examplePlank() {
 }
 
 /**
- * ПРИМЕР 4: Малый рекорд (меньше веса грифа)
- * Показывает корректировку минимального веса
+ * ПРИМЕР 4: Малый рекорд (близко к весу грифа)
+ * Показывает умную подводку для лёгких весов
  */
 export function exampleSmallRecord() {
   const record: ExerciseRecord = {
@@ -126,18 +128,13 @@ export function exampleSmallRecord() {
 
   console.log('=== ПРИМЕР: Малый рекорд (30 кг) ===')
   console.log('Рекорд: 30 кг × 10 повторений')
-  console.log('Демонстрирует корректировку минимального веса\n')
+  console.log('Демонстрирует умные шаги подводки\n')
 
   // Рассчитываем suggestions для 5 подходов
   const suggestions = calculateAllLinearLoadSuggestions(5, record)
   
   suggestions.forEach((suggestion, index) => {
-    const percentage = index === 0 ? 'bar' : `${[40, 60, 80, 100][index - 1]}%`
-    const calculated = index === 0 ? 20 : Math.round(30 * [40, 60, 80, 100][index - 1] / 100)
-    const weight = suggestion.weight ?? 0
-    const correction = weight > calculated ? '' : ` (${calculated} кг → ${weight} кг минимум)`
-    
-    console.log(`Подход ${index + 1}: ${weight} кг × ${suggestion.reps ?? 0} повторений${correction}`)
+    console.log(`Подход ${index + 1}: ${suggestion.weight ?? 0} кг × ${suggestion.reps ?? 0} повторений`)
     console.log(`  └─ ${suggestion.note ?? ''}\n`)
   })
 
@@ -192,7 +189,7 @@ export function exampleAutoDetection() {
   // Упражнение с весом
   const weightSuggestion = calculateSetSuggestion({
     exerciseId: 'exercise-bench-press',
-    exerciseTags: ['weight', 'push', 'chest'],
+    exerciseType: 'weight',
     setNumber: 3,
     record: benchPressRecord,
   })
@@ -210,7 +207,7 @@ export function exampleAutoDetection() {
 
   const repsSuggestion = calculateSetSuggestion({
     exerciseId: 'exercise-pull-ups',
-    exerciseTags: ['pull', 'back'],
+    exerciseType: 'bodyweight',
     setNumber: 2,
     record: bodyweightRecord,
   })
@@ -229,7 +226,7 @@ export function exampleAutoDetection() {
 
   const durationSuggestion = calculateSetSuggestion({
     exerciseId: 'exercise-plank',
-    exerciseTags: ['duration', 'core'],
+    exerciseType: 'duration',
     setNumber: 2,
     record: plankRecord,
   })

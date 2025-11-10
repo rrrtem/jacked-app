@@ -51,18 +51,31 @@ export async function getExerciseById(id: string): Promise<Exercise | null> {
 }
 
 /**
- * Получить упражнения по тегам
+ * Получить упражнения по категориям
  */
-export async function getExercisesByTags(tags: string[]): Promise<Exercise[]> {
+export async function getExercisesByCategory(
+  category: 'exercise_type' | 'muscle_group' | 'equipment' | 'movement_pattern',
+  value: string
+): Promise<Exercise[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('exercises')
     .select('*')
-    .overlaps('tags', tags)
+    .eq(category, value)
     .order('name')
 
   if (error) throw error
   return data || []
+}
+
+/**
+ * @deprecated Используйте getExercisesByCategory вместо этой функции
+ * Получить упражнения по тегам (устаревшая функция)
+ */
+export async function getExercisesByTags(tags: string[]): Promise<Exercise[]> {
+  console.warn('getExercisesByTags is deprecated. Use getExercisesByCategory instead.')
+  // Для обратной совместимости возвращаем все упражнения
+  return getAllExercises()
 }
 
 /**
@@ -668,7 +681,7 @@ export async function updateRecordsFromWorkout(
   workoutSessionId: string,
   exerciseSets: {
     exerciseId: string
-    exerciseTags: string[]
+    exerciseType: string
     sets: {
       weight?: number | null
       reps?: number | null
@@ -682,11 +695,11 @@ export async function updateRecordsFromWorkout(
   for (const exercise of exerciseSets) {
     if (exercise.sets.length === 0) continue
 
-    const { exerciseId, exerciseTags, sets } = exercise
+    const { exerciseId, exerciseType, sets } = exercise
 
-    // Определяем тип упражнения по тегам
-    const hasDurationTag = exerciseTags.includes('duration')
-    const hasWeightTag = exerciseTags.includes('weight')
+    // Определяем тип упражнения
+    const isDuration = exerciseType === 'duration'
+    const isWeight = exerciseType === 'weight'
 
     // Получаем текущий рекорд
     const currentRecord = await getExerciseRecord(userId, exerciseId)
@@ -696,7 +709,7 @@ export async function updateRecordsFromWorkout(
     let newMaxDuration: number | null = null
     let hasNewRecord = false
 
-    if (hasDurationTag) {
+    if (isDuration) {
       // Для упражнений на длительность - ищем максимальное время
       const maxDurationInSets = Math.max(
         ...sets
@@ -719,7 +732,7 @@ export async function updateRecordsFromWorkout(
           notes: `New duration record: ${newMaxDuration}s`,
         })
       }
-    } else if (hasWeightTag) {
+    } else if (isWeight) {
       // Для упражнений с весом - ищем максимальный вес и максимальные повторы при этом весе
       const maxWeightSet = sets.reduce<{ weight: number | null; reps: number | null }>((max, set) => {
         const weight = set.weight ?? 0

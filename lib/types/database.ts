@@ -52,7 +52,9 @@ export interface Database {
           id: string
           name: string
           instructions: string | null
-          tags: string[]
+          exercise_type: string
+          movement_pattern: string
+          muscle_group: string
           created_at: string
           updated_at: string
         }
@@ -60,7 +62,9 @@ export interface Database {
           id?: string
           name: string
           instructions?: string | null
-          tags?: string[]
+          exercise_type: string
+          movement_pattern: string
+          muscle_group: string
           created_at?: string
           updated_at?: string
         }
@@ -68,7 +72,9 @@ export interface Database {
           id?: string
           name?: string
           instructions?: string | null
-          tags?: string[]
+          exercise_type?: string
+          movement_pattern?: string
+          muscle_group?: string
           created_at?: string
           updated_at?: string
         }

@@ -139,11 +139,11 @@
 
 /* Уменьшенное межстрочное расстояние для заголовков упражнений */
 .exercise-title-group {
-  line-height: 90%;
+  line-height: 100%;
 }
 
 .exercise-title-group > * {
-  line-height: 90%;
+  line-height: 100%;
 }
 
 .exercise-title-group > *:not(:first-child) {

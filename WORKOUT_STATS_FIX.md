@@ -125,3 +125,4 @@ ORDER BY started_at DESC;
 - `lib/supabase/queries.ts` - функции работы с БД
 - `db/DATABASE_SCHEMA.md` - схема базы данных
 
+

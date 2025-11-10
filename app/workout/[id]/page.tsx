@@ -21,14 +21,18 @@ type ExerciseData = {
   name: string
   sets: number | null
   instructions?: string
-  tags?: string[] | null
+  exercise_type?: string
+  movement_pattern?: string
+  muscle_group?: string
 }
 
 type DbExercise = {
   id: string
   name: string
   instructions: string | null
-  tags: string[] | null
+  exercise_type: string
+  movement_pattern: string
+  muscle_group: string
 }
 
 type CompletedSet = {
@@ -111,9 +115,9 @@ export default function WorkoutSession() {
     return exercise.workoutEntryId || exercise.id
   }
 
-  const hasTag = (exercise: ExerciseData | null | undefined, tag: string) => {
-    if (!exercise?.tags || exercise.tags.length === 0) return false
-    return exercise.tags.includes(tag)
+  const hasExerciseType = (exercise: ExerciseData | null | undefined, type: string) => {
+    if (!exercise?.exercise_type) return false
+    return exercise.exercise_type === type
   }
 
   /**
@@ -137,7 +141,7 @@ export default function WorkoutSession() {
       }
 
       const exerciseId = exercise.exerciseId || exercise.id
-      const exerciseTags = Array.isArray(exercise.tags) ? exercise.tags : []
+      const exerciseType = exercise.exercise_type || 'weight'
       
       // Получаем рекорд пользователя
       let record = null
@@ -150,7 +154,7 @@ export default function WorkoutSession() {
       // Рассчитываем suggestion
       const suggestion: SetSuggestion = calculateSetSuggestion({
         exerciseId,
-        exerciseTags,
+        exerciseType,
         setNumber,
         record,
       })
@@ -190,8 +194,8 @@ export default function WorkoutSession() {
       const supabase = client ?? createClient()
       const { data, error } = await supabase
         .from("exercises")
-        .select("id, name, instructions, tags")
-        .contains("tags", ["warm"])
+        .select("id, name, instructions, exercise_type, movement_pattern, muscle_group")
+        .eq("exercise_type", "warmup")
 
       if (error) throw error
 
@@ -201,7 +205,9 @@ export default function WorkoutSession() {
         name: exercise.name,
         instructions: exercise.instructions || undefined,
         sets: null,
-        tags: Array.isArray(exercise.tags) ? exercise.tags : [],
+        exercise_type: exercise.exercise_type,
+        movement_pattern: exercise.movement_pattern,
+        muscle_group: exercise.muscle_group,
       }))
     } catch (error) {
       console.error("Error loading warmup exercises:", error)
@@ -239,7 +245,7 @@ export default function WorkoutSession() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("exercises")
-        .select("id, name, instructions, tags")
+        .select("id, name, instructions, exercise_type, movement_pattern, muscle_group")
         .order("name")
 
       if (error) throw error
@@ -261,7 +267,9 @@ export default function WorkoutSession() {
       name: exercise.name,
       sets: null,
       instructions: exercise.instructions || undefined,
-      tags: Array.isArray(exercise.tags) ? exercise.tags : [],
+      exercise_type: exercise.exercise_type,
+      movement_pattern: exercise.movement_pattern,
+      muscle_group: exercise.muscle_group,
     }
 
     setExercises([...exercises, newExercise])
@@ -281,13 +289,14 @@ export default function WorkoutSession() {
         const hasStoredExerciseId = Boolean(ex.exerciseId)
         const workoutEntryId = ex.workoutEntryId ?? (!hasStoredExerciseId ? ex.id ?? null : null)
         const resolvedExerciseId = ex.exerciseId ?? null
-        const tags = Array.isArray(ex.tags) ? ex.tags : []
 
         return {
           ...ex,
           workoutEntryId: workoutEntryId ?? null,
           exerciseId: resolvedExerciseId,
-          tags,
+          exercise_type: ex.exercise_type || 'weight',
+          movement_pattern: ex.movement_pattern,
+          muscle_group: ex.muscle_group,
         }
       })
       
@@ -317,7 +326,7 @@ export default function WorkoutSession() {
           if (knownExerciseIds.length > 0) {
             const { data: exercisesData } = await supabase
               .from("exercises")
-              .select("id, name, instructions, tags")
+              .select("id, name, instructions, exercise_type, movement_pattern, muscle_group")
               .in("id", knownExerciseIds)
 
             exercisesData?.forEach((exercise) => {
@@ -348,7 +357,7 @@ export default function WorkoutSession() {
               if (fallbackExerciseIds.length > 0) {
                 const { data: fallbackExercises } = await supabase
                   .from("exercises")
-                  .select("id, name, instructions, tags")
+                  .select("id, name, instructions, exercise_type, movement_pattern, muscle_group")
                   .in("id", fallbackExerciseIds)
 
                 fallbackExercises?.forEach((exercise) => {
@@ -380,14 +389,13 @@ export default function WorkoutSession() {
 
             return {
               ...ex,
+              name: dbExercise?.name || ex.name,
               id: lookupId ?? ex.id,
               exerciseId: lookupId ?? ex.exerciseId ?? ex.id,
               instructions: dbExercise?.instructions || ex.instructions || undefined,
-              tags: Array.isArray(dbExercise?.tags)
-                ? dbExercise?.tags
-                : Array.isArray(ex.tags)
-                  ? ex.tags
-                  : [],
+              exercise_type: dbExercise?.exercise_type || ex.exercise_type || 'weight',
+              movement_pattern: dbExercise?.movement_pattern || ex.movement_pattern,
+              muscle_group: dbExercise?.muscle_group || ex.muscle_group,
             }
           })
 
@@ -580,13 +588,13 @@ export default function WorkoutSession() {
     const exercise = exercises[currentExercise]
     if (!exercise) return
 
-    const tags = Array.isArray(exercise.tags) ? exercise.tags : []
+    const exerciseType = exercise.exercise_type || 'weight'
 
-    if (!tags.includes("weight") && isEditingWeight) {
+    if (exerciseType !== 'weight' && isEditingWeight) {
       setIsEditingWeight(false)
     }
 
-    if (tags.includes("duration")) {
+    if (exerciseType === 'duration') {
       if (isEditingReps) {
         setIsEditingReps(false)
       }
@@ -723,8 +731,8 @@ export default function WorkoutSession() {
     const exerciseKey = getExerciseKey(exerciseData)
     if (!exerciseKey) return
 
-    const isDurationExercise = hasTag(exerciseData, "duration")
-    const isWeightExercise = hasTag(exerciseData, "weight")
+    const isDurationExercise = hasExerciseType(exerciseData, "duration")
+    const isWeightExercise = hasExerciseType(exerciseData, "weight")
 
     if (isDurationExercise) {
       const durationValue = parseInt(duration || "0", 10)
@@ -776,8 +784,8 @@ export default function WorkoutSession() {
   }
 
   const renderExerciseControls = (exerciseData: ExerciseData) => {
-    const isDurationExercise = hasTag(exerciseData, "duration")
-    const isWeightExercise = hasTag(exerciseData, "weight")
+    const isDurationExercise = hasExerciseType(exerciseData, "duration")
+    const isWeightExercise = hasExerciseType(exerciseData, "weight")
 
     return (
       <div className={bottomWrapperClasses}>
@@ -976,7 +984,7 @@ export default function WorkoutSession() {
       // Подготавливаем данные для обновления рекордов
       const exerciseSetsForRecords: {
         exerciseId: string
-        exerciseTags: string[]
+        exerciseType: string
         sets: {
           weight?: number | null
           reps?: number | null
@@ -1035,7 +1043,7 @@ export default function WorkoutSession() {
         // Добавляем данные для обновления рекордов
         exerciseSetsForRecords.push({
           exerciseId: exerciseIdForDb,
-          exerciseTags: exercise.tags || [],
+          exerciseType: exercise.exercise_type || 'weight',
           sets: setsData.map(s => ({
             weight: s.weight,
             reps: s.reps,
@@ -1083,8 +1091,8 @@ export default function WorkoutSession() {
     // Если есть текущие введенные значения (не нулевые), сохраняем их
     if (stage === "exercise-warmup" || stage === "working-set") {
       const currentExerciseData = exercises[currentExercise]
-      const isDurationExercise = hasTag(currentExerciseData, "duration")
-      const isWeightExercise = hasTag(currentExerciseData, "weight")
+      const isDurationExercise = hasExerciseType(currentExerciseData, "duration")
+      const isWeightExercise = hasExerciseType(currentExerciseData, "weight")
       const hasDuration = parseInt(duration || "0", 10) > 0
       const hasReps = parseInt(reps || "0", 10) > 0
       const hasWeight = isWeightExercise ? parseFloat(weight || "0") > 0 : false
@@ -1359,7 +1367,7 @@ export default function WorkoutSession() {
 
           <div className="mb-8">
             <h1 className="text-[60px] leading-[110%] font-normal text-[#000000]">
-              What's next?
+              something else?
             </h1>
           </div>
 
