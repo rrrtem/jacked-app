@@ -372,9 +372,13 @@ export default function WorkoutTracker() {
                 <path d="M18.1818 10C18.1818 5.48131 14.5187 1.81818 10 1.81818C5.48131 1.81818 1.81818 5.48131 1.81818 10C1.81818 14.5187 5.48131 18.1818 10 18.1818C14.5187 18.1818 18.1818 14.5187 18.1818 10ZM9.09091 4.54545C9.09091 4.04338 9.49792 3.63636 10 3.63636C10.5021 3.63636 10.9091 4.04338 10.9091 4.54545V9.43803L14.043 11.005C14.492 11.2295 14.6741 11.7757 14.4496 12.2248C14.225 12.6739 13.6788 12.8559 13.2298 12.6314L9.5934 10.8132C9.28541 10.6592 9.09091 10.3443 9.09091 10V4.54545ZM20 10C20 15.5228 15.5228 20 10 20C4.47715 20 0 15.5228 0 10C0 4.47715 4.47715 0 10 0C15.5228 0 20 4.47715 20 10Z" fill="#1E1E1E"/>
               </svg>
             </Link>
-            <button className="p-2" aria-label="Settings">
+            <Link
+              href="/settings"
+              className="p-2"
+              aria-label="Settings"
+            >
               <Settings className="w-6 h-6 text-[#000000]" />
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -407,7 +411,7 @@ export default function WorkoutTracker() {
 
                 return (
                   <Link
-                    href={`/history/${item.fullDate}`}
+                    href={item.active ? `/history#${item.fullDate}` : `/history`}
                     key={index}
                     className={`
                       aspect-square flex flex-col items-center justify-center text-[20px] leading-[120%]
@@ -418,7 +422,7 @@ export default function WorkoutTracker() {
                       ${item.isFuture && !item.today ? "text-[#000000] opacity-20" : ""}
                       ${item.today ? "hover:bg-[#ff4520]" : ""}
                       ${item.active && !item.today ? "hover:bg-[#a8d5ff]" : "hover:bg-[#f7f7f7]"}
-                      cursor-pointer
+                      ${item.active || item.today ? "cursor-pointer" : "cursor-default pointer-events-none"}
                     `}
                     data-calendar-cell="true"
                   >

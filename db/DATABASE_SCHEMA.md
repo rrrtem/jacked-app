@@ -16,6 +16,10 @@
 | `email` | TEXT | Email пользователя (уникальный) |
 | `name` | TEXT | Имя пользователя |
 | `avatar_url` | TEXT | URL аватара |
+| `total_workouts` | INTEGER | Общее количество тренировок (по умолчанию 0) |
+| `total_weight_lifted` | DECIMAL | Общий поднятый вес (кг) (по умолчанию 0) |
+| `progression_config` | TEXT | ID конфигурации логики прогрессии (по умолчанию 'standard-linear') |
+| `training_preferences` | TEXT | Свободное текстовое поле для описания подхода к тренировкам |
 | `created_at` | TIMESTAMPTZ | Дата создания |
 | `updated_at` | TIMESTAMPTZ | Дата обновления |
 

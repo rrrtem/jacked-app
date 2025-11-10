@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Trash2 } from "lucide-react"
@@ -44,6 +44,10 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [swipedWorkoutId, setSwipedWorkoutId] = useState<string | null>(null)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [swipeDistance, setSwipeDistance] = useState(0)
+  const workoutRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   useEffect(() => {
     const fetchWorkouts = async () => {
@@ -109,9 +113,35 @@ export default function HistoryPage() {
     fetchWorkouts()
   }, [router])
 
-  const handleDelete = async (sessionId: string, e: React.MouseEvent) => {
-    e.preventDefault() // Предотвращаем переход по ссылке
-    e.stopPropagation()
+  // Автоматический скролл к дате из хеша URL
+  useEffect(() => {
+    if (typeof window === "undefined" || workouts.length === 0) return
+
+    const hash = window.location.hash.slice(1) // Убираем #
+    if (!hash) return
+
+    // Ищем тренировку с этой датой
+    const targetWorkout = workouts.find((w) => {
+      if (!w.started_at) return false
+      const workoutDate = w.started_at.slice(0, 10) // YYYY-MM-DD
+      return workoutDate === hash
+    })
+
+    if (targetWorkout) {
+      // Даем время на рендер
+      setTimeout(() => {
+        const element = workoutRefs.current[targetWorkout.id]
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      }, 100)
+    }
+  }, [workouts])
+
+  const handleDelete = async (sessionId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation()
+    }
 
     if (!confirm("Are you sure you want to delete this workout?")) {
       return
@@ -126,15 +156,52 @@ export default function HistoryPage() {
       alert("Failed to delete workout")
     } finally {
       setDeletingId(null)
+      setSwipedWorkoutId(null)
+      setSwipeDistance(0)
     }
+  }
+
+  const handleTouchStart = (e: React.TouchEvent, workoutId: string) => {
+    setTouchStart(e.touches[0].clientX)
+    setSwipedWorkoutId(workoutId)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent, workoutId: string) => {
+    if (touchStart === null) return
+
+    const touchCurrent = e.touches[0].clientX
+    const diff = touchStart - touchCurrent
+
+    // Only allow left swipe (positive diff), max 100px
+    if (diff > 0) {
+      setSwipeDistance(Math.min(diff, 100))
+    } else if (diff < 0) {
+      // Allow swipe back to close
+      setSwipeDistance(Math.max(0, swipeDistance + diff * 0.5))
+    }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent, workoutId: string) => {
+    if (touchStart === null) return
+
+    // If swiped more than 80px (fully revealed), delete
+    if (swipeDistance >= 80) {
+      handleDelete(workoutId)
+    } else {
+      // Otherwise reset with animation
+      setSwipeDistance(0)
+      setSwipedWorkoutId(null)
+    }
+
+    setTouchStart(null)
   }
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const day = date.getDate()
-    const month = date.toLocaleDateString("ru-RU", { month: "short" })
-    const year = date.getFullYear()
-    return `${day} ${month} ${year}`
+    const month = date.getMonth() + 1
+    const year = date.getFullYear().toString().slice(-2)
+    return `${day}/${month}/${year}`
   }
 
   const formatDuration = (seconds: number | null) => {
@@ -153,6 +220,21 @@ export default function HistoryPage() {
     return Number.isInteger(numericValue)
       ? numericValue.toString()
       : numericValue.toFixed(1)
+  }
+  
+  const formatSet = (set: WorkoutSet) => {
+    const parts = []
+    const weight = formatWeight(set.weight)
+    if (weight) {
+      parts.push(`${weight}kg`)
+    }
+    if (set.reps) {
+      parts.push(`×${set.reps}`)
+    }
+    if (set.duration) {
+      parts.push(`${set.duration}s`)
+    }
+    return parts.length > 0 ? parts.join("") : "—"
   }
 
   return (
@@ -205,56 +287,65 @@ export default function HistoryPage() {
                 (sum, ex) => sum + (ex.sets?.length || 0),
                 0
               )
+              const currentSwipe = swipedWorkoutId === workout.id ? swipeDistance : 0
+              const workoutDate = workout.started_at?.slice(0, 10) || ""
               
               return (
-                <div key={workout.id} className="border-b border-[rgba(0,0,0,0.1)]">
-                  <Link
-                    href={`/workout/${workout.id}`}
-                    className="flex items-center justify-between py-4 transition-all duration-200 hover:bg-[#f7f7f7] group"
+                <div 
+                  key={workout.id} 
+                  id={workoutDate}
+                  ref={(el) => {
+                    workoutRefs.current[workout.id] = el
+                  }}
+                  className="relative overflow-hidden border-b border-[rgba(0,0,0,0.1)] group"
+                  onTouchStart={(e) => handleTouchStart(e, workout.id)}
+                  onTouchMove={(e) => handleTouchMove(e, workout.id)}
+                  onTouchEnd={(e) => handleTouchEnd(e, workout.id)}
+                >
+                  {/* Красная кнопка удаления позади (swipe на мобиле) */}
+                  <div 
+                    className="absolute right-0 top-0 h-full bg-[#ff2f00] flex items-center justify-center transition-all"
+                    style={{
+                      width: `${currentSwipe}px`,
+                      opacity: Math.min(currentSwipe / 80, 1),
+                    }}
+                  >
+                    <Trash2 
+                      className="w-6 h-6 text-[#ffffff]"
+                      style={{
+                        opacity: Math.min(currentSwipe / 60, 1),
+                        transform: `scale(${Math.min(currentSwipe / 80, 1)})`,
+                      }}
+                    />
+                  </div>
+                  
+                  <div
+                    className="flex items-center justify-between py-4 bg-[#ffffff] relative z-10"
+                    style={{
+                      transform: `translateX(-${currentSwipe}px)`,
+                      transition: touchStart === null ? 'transform 0.3s ease-out' : 'none',
+                    }}
                   >
                     <div className="flex-1">
+                      {/* Заголовок: дата · длительность */}
                       <div className="text-[20px] leading-[120%] text-[#000000] mb-1">
-                        {formatDate(workout.started_at || "")}
-                      </div>
-                      <div className="text-[16px] leading-[140%] text-[rgba(0,0,0,0.5)]">
-                        {workout.exercises.length}{" "}
-                        {workout.exercises.length === 1
-                          ? "exercise"
-                          : "exercises"}{" "}
-                        · {totalSets}{" "}
-                        {totalSets === 1
-                          ? "set"
-                          : "sets"}{" "}
-                        · {formatDuration(workout.duration)}
+                        {formatDate(workout.started_at || "")} · {formatDuration(workout.duration)}
                       </div>
                       
-                      {/* Детальная информация */}
-                      <div className="mt-3 space-y-2">
-                        {workout.exercises.map((exercise, idx) => (
+                      {/* Детальная информация: упражнения с подходами */}
+                      <div className="mt-2 space-y-1">
+                        {workout.exercises.map((exercise) => (
                           <div
                             key={exercise.id}
                             className="text-[12px] leading-[140%] text-[rgba(0,0,0,0.4)]"
                           >
-                            <span className="font-medium">
-                              {idx + 1}. {exercise.exercise?.name || "Exercise"}:
+                            <span className="lowercase">
+                              {exercise.exercise?.name || "exercise"}:
                             </span>{" "}
                             {exercise.sets && exercise.sets.length > 0 ? (
                               exercise.sets
-                                .map((set) => {
-                                  const parts = []
-                                  const weight = formatWeight(set.weight)
-                                  if (weight) {
-                                    parts.push(`${weight}kg`)
-                                  }
-                                  if (set.reps) {
-                                    parts.push(`×${set.reps}`)
-                                  }
-                                  if (set.duration) {
-                                    parts.push(`${set.duration}s`)
-                                  }
-                                  return parts.length > 0 ? parts.join(" ") : "—"
-                                })
-                                .join(", ")
+                                .map((set) => formatSet(set))
+                                .join(" · ")
                             ) : (
                               <span className="text-[rgba(0,0,0,0.25)]">
                                 no sets
@@ -264,10 +355,12 @@ export default function HistoryPage() {
                         ))}
                       </div>
                     </div>
+                    
+                    {/* Иконка удаления по hover на десктопе */}
                     <button
                       onClick={(e) => handleDelete(workout.id, e)}
                       disabled={deletingId === workout.id}
-                      className="p-2 text-[rgba(0,0,0,0.3)] hover:text-[#ff2f00] hover:bg-[#ff2f00]/10 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ml-2 self-start"
+                      className="hidden md:flex opacity-0 group-hover:opacity-100 transition-opacity p-2 text-[rgba(0,0,0,0.3)] hover:text-[#ff2f00] hover:bg-[#ff2f00]/10 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ml-2 self-start"
                       aria-label="Delete workout"
                     >
                       <Trash2
@@ -276,23 +369,13 @@ export default function HistoryPage() {
                         }`}
                       />
                     </button>
-                  </Link>
+                  </div>
                 </div>
               )
             })
           )}
         </div>
 
-        {/* Back Button */}
-        {!loading && workouts.length > 0 && (
-          <div className="mt-8">
-            <Link href="/">
-              <button className="w-full bg-[#f7f7f7] text-[#000000] py-4 rounded-[60px] text-[20px] leading-[120%] font-normal hover:bg-[#ebebeb] transition-colors">
-                back to home
-              </button>
-            </Link>
-          </div>
-        )}
       </div>
     </div>
   )

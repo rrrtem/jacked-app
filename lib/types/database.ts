@@ -22,6 +22,8 @@ export interface Database {
           avatar_url: string | null
           total_workouts: number
           total_weight_lifted: number
+          progression_config: string | null
+          training_preferences: string | null
           created_at: string
           updated_at: string
         }
@@ -32,6 +34,8 @@ export interface Database {
           avatar_url?: string | null
           total_workouts?: number
           total_weight_lifted?: number
+          progression_config?: string | null
+          training_preferences?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -42,6 +46,8 @@ export interface Database {
           avatar_url?: string | null
           total_workouts?: number
           total_weight_lifted?: number
+          progression_config?: string | null
+          training_preferences?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -317,6 +323,27 @@ export interface Database {
         }
         Relationships: []
       }
+      favorite_exercises: {
+        Row: {
+          id: string
+          user_id: string
+          exercise_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          exercise_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          exercise_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -343,6 +370,7 @@ export type WorkoutSetExercise = Database['public']['Tables']['workout_set_exerc
 export type WorkoutSession = Database['public']['Tables']['workout_sessions']['Row']
 export type WorkoutSessionExercise = Database['public']['Tables']['workout_session_exercises']['Row']
 export type WorkoutSessionSet = Database['public']['Tables']['workout_session_sets']['Row']
+export type FavoriteExercise = Database['public']['Tables']['favorite_exercises']['Row']
 
 // Типы для вставки (Insert)
 export type UserInsert = Database['public']['Tables']['users']['Insert']
@@ -354,6 +382,7 @@ export type WorkoutSetExerciseInsert = Database['public']['Tables']['workout_set
 export type WorkoutSessionInsert = Database['public']['Tables']['workout_sessions']['Insert']
 export type WorkoutSessionExerciseInsert = Database['public']['Tables']['workout_session_exercises']['Insert']
 export type WorkoutSessionSetInsert = Database['public']['Tables']['workout_session_sets']['Insert']
+export type FavoriteExerciseInsert = Database['public']['Tables']['favorite_exercises']['Insert']
 
 // Типы для обновления (Update)
 export type UserUpdate = Database['public']['Tables']['users']['Update']
@@ -365,6 +394,7 @@ export type WorkoutSetExerciseUpdate = Database['public']['Tables']['workout_set
 export type WorkoutSessionUpdate = Database['public']['Tables']['workout_sessions']['Update']
 export type WorkoutSessionExerciseUpdate = Database['public']['Tables']['workout_session_exercises']['Update']
 export type WorkoutSessionSetUpdate = Database['public']['Tables']['workout_session_sets']['Update']
+export type FavoriteExerciseUpdate = Database['public']['Tables']['favorite_exercises']['Update']
 
 // Расширенные типы с JOIN данными
 
@@ -372,6 +402,14 @@ export type WorkoutSessionSetUpdate = Database['public']['Tables']['workout_sess
  * Упражнение с личными рекордами пользователя
  */
 export type ExerciseWithRecords = Exercise & {
+  record?: ExerciseRecord
+}
+
+/**
+ * Упражнение с дополнительными данными (избранное)
+ */
+export type ExerciseWithMeta = Exercise & {
+  is_favorite?: boolean
   record?: ExerciseRecord
 }
 

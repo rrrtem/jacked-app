@@ -18,6 +18,115 @@ import type {
 } from '@/lib/types/database'
 
 // ============================================
+// ИЗБРАННЫЕ УПРАЖНЕНИЯ (Favorite Exercises)
+// ============================================
+
+/**
+ * Добавить упражнение в избранное
+ */
+export async function addExerciseToFavorites(
+  userId: string,
+  exerciseId: string
+) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('favorite_exercises')
+    .insert({
+      user_id: userId,
+      exercise_id: exerciseId,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error adding to favorites:', error)
+    throw error
+  }
+  return data
+}
+
+/**
+ * Удалить упражнение из избранного
+ */
+export async function removeExerciseFromFavorites(
+  userId: string,
+  exerciseId: string
+) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('favorite_exercises')
+    .delete()
+    .eq('user_id', userId)
+    .eq('exercise_id', exerciseId)
+
+  if (error) {
+    console.error('Error removing from favorites:', error)
+    throw error
+  }
+}
+
+/**
+ * Проверить, находится ли упражнение в избранном
+ */
+export async function isExerciseFavorite(
+  userId: string,
+  exerciseId: string
+): Promise<boolean> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('favorite_exercises')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('exercise_id', exerciseId)
+    .maybeSingle()
+
+  // If table doesn't exist yet, return false instead of throwing
+  if (error) {
+    console.warn('Error checking favorite status:', error)
+    return false
+  }
+  return data !== null
+}
+
+/**
+ * Получить все избранные упражнения пользователя
+ */
+export async function getFavoriteExercises(userId: string) {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('favorite_exercises')
+    .select(`
+      id,
+      exercise_id,
+      created_at,
+      exercise:exercises(*)
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+/**
+ * Получить ID избранных упражнений пользователя (для проверки)
+ */
+export async function getFavoriteExerciseIds(userId: string): Promise<string[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('favorite_exercises')
+    .select('exercise_id')
+    .eq('user_id', userId)
+
+  // If table doesn't exist yet, return empty array
+  if (error) {
+    console.warn('Error getting favorite IDs:', error)
+    return []
+  }
+  return data?.map((f) => f.exercise_id) || []
+}
+
+// ============================================
 // УПРАЖНЕНИЯ (Exercises)
 // ============================================
 
@@ -642,7 +751,7 @@ export async function getExerciseRecordHistory(
     .limit(limit)
 
   if (error) throw error
-  return data
+  return data || []
 }
 
 /**
