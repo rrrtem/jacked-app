@@ -173,6 +173,41 @@ export default function WorkoutTracker() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [calendarHeight, setCalendarHeight] = useState<number | null>(null)
   const calendarRef = useRef<HTMLDivElement>(null)
+  const [activeWorkoutId, setActiveWorkoutId] = useState<string | null>(null)
+
+  // Проверяем наличие активной тренировки
+  useEffect(() => {
+    const checkActiveWorkout = () => {
+      if (typeof window === "undefined") return
+      
+      const workoutId = localStorage.getItem("currentWorkoutId")
+      const workoutState = localStorage.getItem("workoutState")
+      
+      // Если есть ID и состояние тренировки, значит есть активная тренировка
+      if (workoutId && workoutState) {
+        try {
+          const state = JSON.parse(workoutState)
+          // Проверяем, что тренировка не завершена
+          if (state.stage !== "finished") {
+            setActiveWorkoutId(workoutId)
+          }
+        } catch {
+          // Если ошибка парсинга - очищаем
+          localStorage.removeItem("currentWorkoutId")
+          localStorage.removeItem("workoutState")
+        }
+      }
+    }
+    
+    checkActiveWorkout()
+    
+    // Проверяем при фокусе на окне (когда возвращаемся на вкладку)
+    window.addEventListener("focus", checkActiveWorkout)
+    
+    return () => {
+      window.removeEventListener("focus", checkActiveWorkout)
+    }
+  }, [])
 
   useEffect(() => {
     const updateHeight = () => {
@@ -441,11 +476,38 @@ export default function WorkoutTracker() {
               }}
             />
 
-            <Link href="/start" className="block">
-              <button className="w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90 transition-opacity">
-                new workout
-              </button>
-            </Link>
+            <div className="space-y-3">
+              {activeWorkoutId && (
+                <Link href={`/workout/${activeWorkoutId}`} className="block">
+                  <button className="w-full bg-[#ff2f00] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90 transition-opacity">
+                    continue workout
+                  </button>
+                </Link>
+              )}
+              <Link 
+                href="/start" 
+                className="block"
+                onClick={() => {
+                  // Если есть активная тренировка, очищаем её данные при старте новой
+                  if (activeWorkoutId) {
+                    if (confirm("You have an active workout. Starting a new workout will discard it. Continue?")) {
+                      localStorage.removeItem("workoutState")
+                      localStorage.removeItem("currentWorkoutId")
+                      setActiveWorkoutId(null)
+                    } else {
+                      // Отменяем переход
+                      return false
+                    }
+                  }
+                }}
+              >
+                <button className={`w-full text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90 transition-opacity ${
+                  activeWorkoutId ? "bg-[#000000]" : "bg-[#000000]"
+                }`}>
+                  new workout
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, ChangeEvent, useRef, FocusEvent } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { ArrowRight, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { calculateSetSuggestion } from "@/lib/progression"
@@ -44,6 +44,8 @@ type CompletedSet = {
 
 export default function WorkoutSession() {
   const router = useRouter()
+  const params = useParams()
+  const workoutIdFromUrl = params.id as string
 
   // Загружаем упражнения из localStorage
   const loadExercises = (): ExerciseData[] => {
@@ -68,7 +70,20 @@ export default function WorkoutSession() {
   const loadWorkoutState = () => {
     if (typeof window === "undefined") return null
     const saved = localStorage.getItem("workoutState")
-    return saved ? JSON.parse(saved) : null
+    if (!saved) return null
+    
+    try {
+      const state = JSON.parse(saved)
+      // Проверяем, что ID тренировки совпадает с URL
+      const savedWorkoutId = localStorage.getItem("currentWorkoutId")
+      if (savedWorkoutId !== workoutIdFromUrl) {
+        console.log("Workout ID mismatch, ignoring saved state")
+        return null
+      }
+      return state
+    } catch {
+      return null
+    }
   }
 
   const [isMounted, setIsMounted] = useState(false)
@@ -117,6 +132,12 @@ export default function WorkoutSession() {
 
   const hasExerciseType = (exercise: ExerciseData | null | undefined, type: string) => {
     if (!exercise?.exercise_type) return false
+    
+    // Для типа "weight" проверяем несколько вариантов
+    if (type === 'weight') {
+      return ['weight', 'strength', 'dumbbell', 'barbell'].includes(exercise.exercise_type)
+    }
+    
     return exercise.exercise_type === type
   }
 
@@ -282,6 +303,23 @@ export default function WorkoutSession() {
   // Загружаем сохраненное состояние после монтирования (избегаем hydration mismatch)
   useEffect(() => {
     const loadData = async () => {
+      // Проверяем, что есть ID тренировки в localStorage или это новая тренировка
+      const savedWorkoutId = localStorage.getItem("currentWorkoutId")
+      
+      // Если ID из URL не совпадает с сохраненным и нет данных о начале новой тренировки
+      if (!savedWorkoutId || savedWorkoutId !== workoutIdFromUrl) {
+        // Проверяем, есть ли упражнения для старта (значит только что начали тренировку)
+        const hasExercises = localStorage.getItem("workoutExercises")
+        if (!hasExercises) {
+          // Нет данных для этой тренировки - редиректим на главную
+          console.log("No workout data found, redirecting to home")
+          router.push("/")
+          return
+        }
+        // Если есть упражнения, значит только что начали тренировку - обновляем ID
+        localStorage.setItem("currentWorkoutId", workoutIdFromUrl)
+      }
+      
       const supabase = createClient()
       const savedState = loadWorkoutState()
       const loadedExerciseIds = savedState?.exercises || loadExercises()
@@ -433,13 +471,14 @@ export default function WorkoutSession() {
     }
     
     loadData()
-  }, [])
+  }, [workoutIdFromUrl, router])
 
   // Сохраняем состояние тренировки при каждом изменении
   useEffect(() => {
     if (!isMounted) return // Не сохраняем до полной загрузки
     
     const workoutState = {
+      workoutId: workoutIdFromUrl, // Сохраняем ID тренировки
       stage,
       currentExercise,
       currentSet,
@@ -457,7 +496,7 @@ export default function WorkoutSession() {
       availableExercises,
     }
     localStorage.setItem("workoutState", JSON.stringify(workoutState))
-  }, [isMounted, stage, currentExercise, currentSet, totalTime, warmupTime, restTime, isWorkoutActive, weight, reps, duration, completedSets, exercises, startTime, showExerciseList, availableExercises])
+  }, [isMounted, workoutIdFromUrl, stage, currentExercise, currentSet, totalTime, warmupTime, restTime, isWorkoutActive, weight, reps, duration, completedSets, exercises, startTime, showExerciseList, availableExercises])
 
   useEffect(() => {
     if (!isWorkoutActive) return
@@ -1108,8 +1147,9 @@ export default function WorkoutSession() {
     // Сохраняем тренировку в БД
     await saveWorkoutToDatabase()
     
-    // Очищаем сохраненное состояние тренировки
+    // Очищаем сохраненное состояние тренировки и ID
     localStorage.removeItem("workoutState")
+    localStorage.removeItem("currentWorkoutId")
   }
 
   const skipRest = () => {
@@ -1123,6 +1163,7 @@ export default function WorkoutSession() {
 
     if (typeof window !== "undefined") {
       localStorage.removeItem("workoutState")
+      localStorage.removeItem("currentWorkoutId")
     }
 
     if (typeof window !== "undefined" && window.history.length > 1) {

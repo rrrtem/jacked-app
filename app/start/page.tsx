@@ -4,11 +4,21 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import { X, Mic, Trash2 } from "lucide-react"
+import { X, Mic, Trash2, Plus, Sparkles } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
 import type { WorkoutSetWithExercises } from "@/lib/types/database"
 import { ExerciseSelector } from "@/components/ExerciseSelector"
+import { 
+  addExerciseToWorkoutSet, 
+  removeExerciseFromWorkoutSet,
+  createWorkoutSet,
+  getWorkoutHistoryForAI
+} from "@/lib/supabase/queries"
+import {
+  getAISuggestedWorkout,
+  mapSupabaseToAIHistory,
+} from "@/lib/ai-suggest"
 
 type Exercise = {
   id: string
@@ -16,6 +26,7 @@ type Exercise = {
   name: string
   sets: number | null
   warmupTime?: string
+  instructions?: string
   exercise_type?: string
   movement_pattern?: string
   muscle_group?: string
@@ -56,8 +67,40 @@ export default function StartWorkout() {
   const [loadingExercises, setLoadingExercises] = useState(false)
   const [modalTouchStart, setModalTouchStart] = useState<number | null>(null)
   const [modalSwipeDistance, setModalSwipeDistance] = useState(0)
+  
+  // Состояния для создания нового сета
+  const [showCreateSetModal, setShowCreateSetModal] = useState(false)
+  const [newSetName, setNewSetName] = useState("")
+  const [creatingSet, setCreatingSet] = useState(false)
+  
+  // Состояния для редактирования названия сета
+  const [editingSetId, setEditingSetId] = useState<string | null>(null)
+  const [editingSetName, setEditingSetName] = useState("")
+  const setNameInputRef = useRef<HTMLInputElement | null>(null)
+  
+  // Упражнения для AI suggested preset (не сохраняются в БД пока)
+  const [aiSuggestedExercises, setAiSuggestedExercises] = useState<Exercise[]>([])
+  const [aiLoading, setAiLoading] = useState(false)
 
   const supabaseClientRef = useRef(createClient())
+
+  // Очистка старого кеша при первой загрузке (одноразово)
+  useEffect(() => {
+    // Проверяем старый формат кеша и очищаем если нужно
+    try {
+      const cached = localStorage.getItem('ai-suggested-workout-cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        // Если есть старое поле lastWorkoutCount - очищаем кеш
+        if ('lastWorkoutCount' in parsed) {
+          console.log('🗑️ Clearing old AI cache format')
+          localStorage.removeItem('ai-suggested-workout-cache')
+        }
+      }
+    } catch (error) {
+      console.error('Error checking cache:', error)
+    }
+  }, [])
 
   useEffect(() => {
     const supabase = supabaseClientRef.current
@@ -223,14 +266,52 @@ export default function StartWorkout() {
     setWarmupInputValue("")
     setSwipedExerciseId(null)
     setSwipeDistance(0)
+    
+    // Загружаем AI Suggested при переключении на этот таб
+    if (activePreset === 'ai-suggested' && aiSuggestedExercises.length === 0) {
+      loadAISuggested()
+    }
   }, [activePreset])
 
-  const activePresetData = activePreset ? presets.find((p) => p.id === activePreset) : undefined
+  // Специальная обработка для AI suggested preset
+  const isAISuggested = activePreset === 'ai-suggested'
+  const activePresetData = isAISuggested 
+    ? {
+        id: 'ai-suggested',
+        label: 'ai suggested',
+        exercises: [
+          {
+            id: 'warmup-ai',
+            exerciseId: null,
+            name: "warm up",
+            sets: null,
+            warmupTime: "10:00",
+            exercise_type: 'warmup' as const,
+            movement_pattern: 'complex' as const,
+            muscle_group: 'full_body' as const,
+          },
+          ...aiSuggestedExercises
+        ]
+      }
+    : activePreset ? presets.find((p) => p.id === activePreset) : undefined
+  
   const isStartDisabled = !activePresetData || activePresetData.exercises.length === 0
 
-  const handleDeleteExercise = (exerciseId: string) => {
+  const handleDeleteExercise = async (exerciseId: string) => {
     if (!activePreset) return
-
+    
+    // Для AI suggested - удаляем из отдельного state
+    if (isAISuggested) {
+      setAiSuggestedExercises(prev => prev.filter(ex => ex.id !== exerciseId))
+      setSwipedExerciseId(null)
+      setSwipeDistance(0)
+      return
+    }
+    
+    const activePresetData = presets.find(p => p.id === activePreset)
+    const exerciseToDelete = activePresetData?.exercises.find(ex => ex.id === exerciseId)
+    
+    // Удаляем из UI сразу для быстрого отклика
     setPresets((prev) =>
       prev.map((preset) =>
         preset.id === activePreset
@@ -243,6 +324,16 @@ export default function StartWorkout() {
     )
     setSwipedExerciseId(null)
     setSwipeDistance(0)
+    
+    // Если это не warm up и не временное упражнение, удаляем из БД
+    if (exerciseToDelete && !exerciseToDelete.id.startsWith('warmup-') && !exerciseToDelete.id.startsWith('temp-')) {
+      try {
+        await removeExerciseFromWorkoutSet(exerciseId)
+      } catch (err) {
+        console.error("Error deleting exercise from DB:", err)
+        // Можно добавить toast уведомление об ошибке
+      }
+    }
   }
 
   const handleTouchStart = (e: React.TouchEvent, exerciseId: string, isWarmup: boolean) => {
@@ -305,11 +396,11 @@ export default function StartWorkout() {
   }
   
   // Добавление упражнения в текущий preset
-  const handleAddExercise = (exercise: DbExercise) => {
+  const handleAddExercise = async (exercise: DbExercise) => {
     if (!activePreset) return
     
     const newExercise: Exercise = {
-      id: `temp-${Date.now()}`, // Временный ID для UI
+      id: `temp-${Date.now()}`,
       exerciseId: exercise.id,
       name: exercise.name,
       sets: null,
@@ -318,6 +409,20 @@ export default function StartWorkout() {
       muscle_group: exercise.muscle_group,
     }
     
+    // Для AI suggested - добавляем в отдельный state
+    if (isAISuggested) {
+      setAiSuggestedExercises(prev => [...prev, newExercise])
+      setShowExerciseList(false)
+      setModalSwipeDistance(0)
+      setModalTouchStart(null)
+      return
+    }
+    
+    const activePresetData = presets.find(p => p.id === activePreset)
+    const nextOrderIndex = activePresetData?.exercises.length || 0
+    const tempId = newExercise.id
+    
+    // Добавляем в UI сразу для быстрого отклика
     setPresets((prev) =>
       prev.map((preset) =>
         preset.id === activePreset
@@ -332,6 +437,43 @@ export default function StartWorkout() {
     setShowExerciseList(false)
     setModalSwipeDistance(0)
     setModalTouchStart(null)
+    
+    // Сохраняем в БД
+    try {
+      const savedExercise = await addExerciseToWorkoutSet(
+        activePreset,
+        exercise.id,
+        nextOrderIndex,
+        { target_sets: 3 }
+      )
+      
+      // Обновляем ID с временного на реальный
+      setPresets((prev) =>
+        prev.map((preset) =>
+          preset.id === activePreset
+            ? {
+                ...preset,
+                exercises: preset.exercises.map((ex) =>
+                  ex.id === tempId ? { ...ex, id: savedExercise.id } : ex
+                ),
+              }
+            : preset,
+        ),
+      )
+    } catch (err) {
+      console.error("Error adding exercise to DB:", err)
+      // В случае ошибки удаляем упражнение из UI
+      setPresets((prev) =>
+        prev.map((preset) =>
+          preset.id === activePreset
+            ? {
+                ...preset,
+                exercises: preset.exercises.filter((ex) => ex.id !== tempId),
+              }
+            : preset,
+        ),
+      )
+    }
   }
 
   const handleWarmupFocus = (exerciseId: string, currentTime: string) => {
@@ -350,6 +492,9 @@ export default function StartWorkout() {
     // Форматируем введенное значение в MM:SS
     const minutes = warmupInputValue || "10"
     const formattedTime = `${minutes.padStart(2, "0")}:00`
+    
+    // AI suggested preset не сохраняем в БД, просто в state
+    // (пока что не обновляем для AI, так как warmup статичный)
     
     setPresets((prev) =>
       prev.map((preset) =>
@@ -402,6 +547,168 @@ export default function StartWorkout() {
 
     setModalTouchStart(null)
   }
+  
+  // Загрузка AI Suggested упражнений
+  const loadAISuggested = async () => {
+    setAiLoading(true)
+    try {
+      const supabase = supabaseClientRef.current
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      
+      if (!session?.user) {
+        console.log('No user session for AI suggested')
+        setAiLoading(false)
+        return
+      }
+      
+      // 1. Загружаем все упражнения из БД
+      const { data: dbExercises } = await supabase
+        .from('exercises')
+        .select('id, name, instructions, exercise_type, movement_pattern, muscle_group')
+      
+      if (!dbExercises || dbExercises.length === 0) {
+        console.error('No exercises found in DB')
+        setAiLoading(false)
+        return
+      }
+      
+      // 2. Получаем историю тренировок из БД (последние 14 дней)
+      const supabaseHistory = await getWorkoutHistoryForAI(session.user.id, 14)
+      
+      // 3. Преобразуем в формат для AI
+      const history = mapSupabaseToAIHistory(supabaseHistory)
+      
+      // 4. Генерируем рекомендации (с кешированием)
+      const suggested = getAISuggestedWorkout(history, dbExercises)
+      
+      // 5. Преобразуем в формат Exercise для UI
+      const exercises: Exercise[] = suggested.exercises.map((ex, idx) => {
+        // Находим полные данные упражнения в БД
+        const dbEx = dbExercises.find(e => e.id === ex.exerciseId)
+        
+        if (!dbEx) {
+          console.warn(`Exercise not found in DB: ${ex.name} (ID: ${ex.exerciseId})`)
+        }
+        
+        return {
+          id: `ai-${idx}-${Date.now()}`,
+          exerciseId: dbEx?.id || ex.exerciseId,
+          name: dbEx?.name || ex.name,
+          sets: ex.suggestedSets,
+          instructions: dbEx?.instructions || undefined,
+          exercise_type: dbEx?.exercise_type || 'weight',
+          movement_pattern: dbEx?.movement_pattern || 'complex',
+          muscle_group: dbEx?.muscle_group || 'chest',
+        }
+      })
+      
+      setAiSuggestedExercises(exercises)
+      
+      console.log('✅ AI Suggested loaded:', {
+        exercises: exercises.length,
+        basedOn: suggested.basedOnWorkoutCount
+      })
+    } catch (error) {
+      console.error('Error loading AI suggested:', error)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+  
+  // Создание нового сета
+  const handleCreateNewSet = async () => {
+    if (!newSetName.trim() || creatingSet) return
+    
+    setCreatingSet(true)
+    try {
+      const supabase = supabaseClientRef.current
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      
+      if (!session?.user) {
+        alert("Please sign in to create a set")
+        return
+      }
+      
+      const newSet = await createWorkoutSet(
+        session.user.id,
+        newSetName.trim(),
+        "Custom workout set"
+      )
+      
+      // Добавляем новый сет в список
+      const newPreset: Preset = {
+        id: newSet.id,
+        label: newSet.name,
+        exercises: [
+          {
+            id: `warmup-${newSet.id}`,
+            exerciseId: null,
+            name: "warm up",
+            sets: null,
+            warmupTime: "10:00",
+            exercise_type: 'warmup',
+            movement_pattern: 'complex',
+            muscle_group: 'full_body',
+          }
+        ],
+      }
+      
+      setPresets(prev => [...prev, newPreset])
+      setActivePreset(newSet.id)
+      setShowCreateSetModal(false)
+      setNewSetName("")
+    } catch (err) {
+      console.error("Error creating set:", err)
+      alert("Failed to create set. Please try again.")
+    } finally {
+      setCreatingSet(false)
+    }
+  }
+  
+  // Начать редактирование названия сета
+  const handleStartEditingSetName = (setId: string, currentName: string) => {
+    // Не даем редактировать AI suggested
+    if (setId === 'ai-suggested') return
+    
+    setEditingSetId(setId)
+    setEditingSetName(currentName)
+    setTimeout(() => {
+      setNameInputRef.current?.select()
+    }, 0)
+  }
+  
+  // Сохранить новое название сета
+  const handleSaveSetName = async (setId: string) => {
+    const newName = editingSetName.trim()
+    if (!newName || newName === presets.find(p => p.id === setId)?.label) {
+      setEditingSetId(null)
+      setEditingSetName("")
+      return
+    }
+    
+    // Обновляем в UI сразу
+    setPresets(prev => 
+      prev.map(p => p.id === setId ? { ...p, label: newName } : p)
+    )
+    setEditingSetId(null)
+    setEditingSetName("")
+    
+    // Сохраняем в БД
+    try {
+      const supabase = supabaseClientRef.current
+      await supabase
+        .from('workout_sets')
+        .update({ name: newName })
+        .eq('id', setId)
+    } catch (err) {
+      console.error("Error updating set name:", err)
+      // В случае ошибки можно вернуть старое название
+    }
+  }
 
 
   return (
@@ -418,26 +725,127 @@ export default function StartWorkout() {
         </div>
 
         {/* Preset Icons */}
-        <div className="flex items-center gap-3 mb-8 overflow-x-auto">
-          {presets.map((preset) => (
-            <button
-              key={preset.id}
-              onClick={() => setActivePreset(preset.id)}
-              className={`
-                flex-shrink-0 w-14 h-14 rounded-full flex items-center justify-center
-                ${preset.id === activePreset ? "bg-[#000000] text-[#ffffff]" : "bg-[#f7f7f7] text-[#000000]"}
-                hover:opacity-80 transition-opacity
-              `}
-            >
-              <span className="text-[20px] leading-[120%]">
-                {preset.label ? preset.label.toUpperCase() : ""}
-              </span>
-            </button>
-          ))}
+        <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2">
+          {/* AI Suggested Set */}
+          <button
+            onClick={() => setActivePreset('ai-suggested')}
+            className={`
+              flex-shrink-0 h-14 rounded-full flex items-center justify-center px-5 min-w-[56px] transition-all
+              ${activePreset === 'ai-suggested' ? "bg-[#000000] text-[#ffffff]" : "bg-[#f7f7f7] text-[#000000]"}
+              hover:opacity-80
+            `}
+            title="AI suggested workout"
+          >
+            <Sparkles className="w-6 h-6" />
+          </button>
+          
+          {/* Existing presets */}
+          {presets.map((preset) => {
+            const isEditing = editingSetId === preset.id
+            const label = preset.label.toLowerCase()
+            
+            return (
+              <div
+                key={preset.id}
+                className="relative flex-shrink-0"
+              >
+                <div
+                  className={`
+                    h-14 rounded-full flex items-center justify-center px-5 min-w-[56px] transition-all
+                    ${preset.id === activePreset ? "bg-[#000000] text-[#ffffff]" : "bg-[#f7f7f7] text-[#000000]"}
+                    ${!isEditing && "hover:opacity-80 cursor-pointer"}
+                  `}
+                >
+                  {isEditing ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        ref={setNameInputRef}
+                        type="text"
+                        value={editingSetName}
+                        onChange={(e) => setEditingSetName(e.target.value)}
+                        onBlur={() => handleSaveSetName(preset.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSaveSetName(preset.id)
+                          } else if (e.key === 'Escape') {
+                            setEditingSetId(null)
+                            setEditingSetName("")
+                          }
+                        }}
+                        className={`
+                          bg-transparent outline-none text-[20px] leading-[120%] text-center px-1
+                          ${preset.id === activePreset ? "text-[#ffffff]" : "text-[#000000]"}
+                        `}
+                        style={{ width: '80px' }}
+                      />
+                      <button
+                        onMouseDown={(e) => {
+                          e.preventDefault() // Предотвращаем blur на input
+                        }}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          if (confirm(`delete "${preset.label}" set?`)) {
+                            try {
+                              const supabase = supabaseClientRef.current
+                              await supabase
+                                .from('workout_sets')
+                                .delete()
+                                .eq('id', preset.id)
+                              
+                              setPresets(prev => prev.filter(p => p.id !== preset.id))
+                              setEditingSetId(null)
+                              setEditingSetName("")
+                              
+                              // Если удалили активный - переключаемся на первый
+                              if (activePreset === preset.id) {
+                                const remaining = presets.filter(p => p.id !== preset.id)
+                                setActivePreset(remaining.length > 0 ? remaining[0].id : null)
+                              }
+                            } catch (err) {
+                              console.error('Error deleting set:', err)
+                              alert('failed to delete set')
+                            }
+                          }
+                        }}
+                        className="p-1 hover:opacity-70"
+                        title="Delete set"
+                      >
+                        <Trash2 className="w-4 h-4 text-[#ff2f00]" />
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      onClick={() => setActivePreset(preset.id)}
+                      onDoubleClick={() => handleStartEditingSetName(preset.id, preset.label)}
+                      className="text-[20px] leading-[120%] lowercase select-none"
+                    >
+                      {label}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          
+          {/* Add New Set Button */}
+          <button
+            onClick={() => setShowCreateSetModal(true)}
+            className="flex-shrink-0 w-14 h-14 rounded-full flex items-center justify-center bg-[#f7f7f7] text-[#000000] hover:bg-[#e0e0e0] transition-colors"
+            title="Create new set"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
         </div>
 
         {/* Exercise List */}
-        <div className="space-y-0 mb-[200px] border-t border-[rgba(0,0,0,0.1)]">
+        <div className={`space-y-0 mb-[200px] ${!isAISuggested && "border-t border-[rgba(0,0,0,0.1)]"}`}>
+          {/* AI Loading State */}
+          {isAISuggested && aiLoading && (
+            <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
+              generating workout...
+            </div>
+          )}
+          
           {loading ? (
             <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
               Loading templates...
@@ -569,6 +977,10 @@ export default function StartWorkout() {
               <button
                 onClick={() => {
                   if (isStartDisabled) return
+                  
+                  // Генерируем уникальный ID для тренировки (timestamp + random)
+                  const workoutId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                  
                   // Очищаем предыдущее состояние тренировки
                   localStorage.removeItem("workoutState")
                   
@@ -588,6 +1000,7 @@ export default function StartWorkout() {
                       workoutEntryId: ex.id,
                       name: ex.name,
                       sets: ex.sets,
+                      instructions: ex.instructions,
                       exercise_type: ex.exercise_type,
                       movement_pattern: ex.movement_pattern,
                       muscle_group: ex.muscle_group,
@@ -596,7 +1009,11 @@ export default function StartWorkout() {
                   localStorage.setItem("workoutExercises", JSON.stringify(selectedExercises))
                   localStorage.setItem("workoutSetId", activePreset || "")
                   
-                  window.location.href = "/workout/1"
+                  // Сохраняем ID тренировки
+                  localStorage.setItem("currentWorkoutId", workoutId)
+                  
+                  // Переходим на страницу тренировки с уникальным ID
+                  window.location.href = `/workout/${workoutId}`
                 }}
                 disabled={isStartDisabled}
                 className={`w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal transition-opacity ${
@@ -666,6 +1083,64 @@ export default function StartWorkout() {
                     className="px-6 py-3 bg-[#000000] text-[#ffffff] rounded-[60px] text-[16px] leading-[120%]"
                   >
                     done
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+        
+        {/* Модальное окно создания нового сета */}
+        {showCreateSetModal && (
+          <>
+            <div 
+              className="fixed inset-0 bg-[rgba(0,0,0,0.3)] z-[60]" 
+              onClick={() => {
+                setShowCreateSetModal(false)
+                setNewSetName("")
+              }} 
+            />
+            <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#ffffff] rounded-t-[30px] shadow-2xl animate-slide-up">
+              <div className="w-full max-w-md mx-auto p-6">
+                <h2 className="text-[24px] leading-[120%] font-normal text-[#000000] mb-6">
+                  create new set
+                </h2>
+                
+                <div className="mb-6">
+                  <label className="block text-[14px] leading-[140%] text-[rgba(0,0,0,0.6)] mb-2">
+                    set name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. upper body, legs, full body..."
+                    value={newSetName}
+                    onChange={(e) => setNewSetName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newSetName.trim()) {
+                        handleCreateNewSet()
+                      }
+                    }}
+                    autoFocus
+                    className="w-full bg-[#f7f7f7] rounded-[12px] px-4 py-3 text-[16px] leading-[120%] text-[#000000] placeholder:text-[rgba(0,0,0,0.3)] outline-none focus:ring-2 focus:ring-[#000000] lowercase"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowCreateSetModal(false)
+                      setNewSetName("")
+                    }}
+                    className="flex-1 px-6 py-3 bg-[#f7f7f7] text-[#000000] rounded-[60px] text-[16px] leading-[120%] hover:bg-[#e0e0e0] transition-colors"
+                  >
+                    cancel
+                  </button>
+                  <button
+                    onClick={handleCreateNewSet}
+                    disabled={!newSetName.trim() || creatingSet}
+                    className="flex-1 px-6 py-3 bg-[#000000] text-[#ffffff] rounded-[60px] text-[16px] leading-[120%] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {creatingSet ? "creating..." : "create"}
                   </button>
                 </div>
               </div>
