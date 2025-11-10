@@ -653,8 +653,14 @@ export default function WorkoutSession() {
     }
   }, [currentExercise, currentSet, stage, exercises])
 
-  // Статистика для общего веса за все время
-  const [totalLifetimeWeight, setTotalLifetimeWeight] = useState<number | null>(null)
+  // Новые рекорды, установленные в этой тренировке
+  type NewRecord = {
+    exerciseId: string
+    exerciseName: string
+    recordType: string
+    value: string
+  }
+  const [newRecords, setNewRecords] = useState<NewRecord[]>([])
   
   // Загружаем статистику при переходе на финальный экран
   useEffect(() => {
@@ -669,13 +675,12 @@ export default function WorkoutSession() {
           // Получаем статистику пользователя из таблицы users
           const { data: userData } = await supabase
             .from("users")
-            .select("total_workouts, total_weight_lifted")
+            .select("total_workouts")
             .eq("id", session.user.id)
             .single()
 
           if (userData) {
             setTotalWorkouts(userData.total_workouts || 0)
-            setTotalLifetimeWeight(userData.total_weight_lifted || 0)
           }
         }
 
@@ -968,13 +973,12 @@ export default function WorkoutSession() {
         // Получаем обновленную статистику пользователя из таблицы users
         const { data: userData } = await supabase
           .from("users")
-          .select("total_workouts, total_weight_lifted")
+          .select("total_workouts")
           .eq("id", session.user.id)
           .single()
 
         if (userData) {
           setTotalWorkouts(userData.total_workouts || 0)
-          setTotalLifetimeWeight(userData.total_weight_lifted || 0)
           console.log("Stats reloaded:", userData)
         }
       }
@@ -1093,15 +1097,52 @@ export default function WorkoutSession() {
 
       // Обновляем личные рекорды
       try {
-        const { updateRecordsFromWorkout } = await import("@/lib/supabase/queries")
-        const newRecords = await updateRecordsFromWorkout(
+        const { updateRecordsFromWorkout, getExerciseRecord } = await import("@/lib/supabase/queries")
+        const recordsResult = await updateRecordsFromWorkout(
           session.user.id,
           workoutSession.id,
           exerciseSetsForRecords
         )
         
-        if (newRecords.length > 0) {
-          console.log("New records set:", newRecords)
+        if (recordsResult.length > 0) {
+          console.log("New records set:", recordsResult)
+          
+          // Формируем данные для отображения новых рекордов
+          const newRecordsDisplay: NewRecord[] = []
+          
+          for (const record of recordsResult) {
+            // Находим упражнение по ID
+            const exercise = exercises.find(ex => 
+              (ex.exerciseId || ex.id) === record.exerciseId
+            )
+            
+            if (!exercise) continue
+            
+            // Получаем актуальный рекорд из БД
+            const updatedRecord = await getExerciseRecord(session.user.id, record.exerciseId)
+            
+            if (!updatedRecord) continue
+            
+            let value = ''
+            if (record.recordType === 'weight' && updatedRecord.max_weight && updatedRecord.max_reps) {
+              value = `${updatedRecord.max_weight}kg×${updatedRecord.max_reps}`
+            } else if (record.recordType === 'duration' && updatedRecord.max_duration) {
+              value = `${updatedRecord.max_duration}s`
+            } else if (record.recordType === 'reps' && updatedRecord.max_reps) {
+              value = `${updatedRecord.max_reps} reps`
+            }
+            
+            if (value) {
+              newRecordsDisplay.push({
+                exerciseId: record.exerciseId,
+                exerciseName: exercise.name,
+                recordType: record.recordType,
+                value
+              })
+            }
+          }
+          
+          setNewRecords(newRecordsDisplay)
         }
       } catch (recordError) {
         console.error("Error updating records:", recordError)
@@ -1453,49 +1494,66 @@ export default function WorkoutSession() {
   if (stage === "finished") {
     return (
       <div className="min-h-screen bg-[#ffffff] flex flex-col p-[10px] relative">
-        <div className="fixed top-0 left-0 right-0 flex justify-center pointer-events-none z-10">
-          <div
-            className="w-full max-w-md px-[10px] flex justify-end pointer-events-auto"
-            style={{ paddingTop: "calc(10px + env(safe-area-inset-top, 0px))" }}
-          >
-            <Link href="/">
-              <button className="p-2" aria-label="Close">
-                <X className="w-6 h-6 text-[#000000]" />
-              </button>
-            </Link>
+        <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
+          {/* Заголовок done и время */}
+          <div className="mb-8 pt-8">
+            <p className="text-[16px] leading-[120%] text-[rgba(0,0,0,0.3)] mb-4">done</p>
+            <h1 className="text-[60px] leading-[110%] font-normal text-[#000000]">{formatTime(totalTime)}</h1>
           </div>
-        </div>
 
-        <div className="w-full max-w-md mx-auto flex-1 flex flex-col pt-[80px]">
-          <div
-            className="flex-1 flex flex-col justify-end"
-            style={{ paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }}
-          >
-            <div className="mb-8">
-              <h1 className="text-[60px] leading-[110%] font-normal text-[#000000]">{formatTime(totalTime)}</h1>
+          {/* Разделитель */}
+          <div className="border-t border-[rgba(0,0,0,0.1)] mb-6"></div>
+
+          {/* Общая статистика */}
+          <div className="mb-8">
+            {totalWorkouts !== null && (
+              <div className="flex items-center justify-between py-3">
+                <span className="text-[20px] leading-[120%] text-[#000000]">total workouts</span>
+                <span className="text-[20px] leading-[120%] text-[#000000]">{totalWorkouts}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between py-3">
+              <span className="text-[20px] leading-[120%] text-[#000000]">weight</span>
+              <span className="text-[20px] leading-[120%] text-[#000000]">{sessionWeight.toFixed(0)} kg</span>
             </div>
+          </div>
 
-            <div className="mb-8 space-y-2">
-              {totalWorkouts !== null && (
-                <div className="flex items-center justify-between py-4 border-b border-[rgba(0,0,0,0.1)]">
-                  <span className="text-[20px] leading-[120%] text-[#000000]">total workouts</span>
-                  <span className="text-[20px] leading-[120%] text-[#000000]">{totalWorkouts}</span>
-                </div>
-              )}
-              <div className="flex items-center justify-between py-4 border-b border-[rgba(0,0,0,0.1)]">
-                <span className="text-[20px] leading-[120%] text-[#000000]">session volume</span>
-                <span className="text-[20px] leading-[120%] text-[#000000]">{sessionWeight.toFixed(0)} kg</span>
+          {/* Рекорды - показываем только новые рекорды из этой тренировки */}
+          {newRecords.length > 0 && (
+            <div className="mb-8">
+              <p className="text-[16px] leading-[120%] text-[rgba(0,0,0,0.3)] mb-4">records</p>
+              <div className="space-y-3">
+                {newRecords.map((record) => (
+                  <div key={record.exerciseId} className="flex items-center justify-between py-2">
+                    <span className="text-[20px] leading-[120%] text-[#000000]">{record.exerciseName}</span>
+                    <span className="text-[20px] leading-[120%] text-[#000000]">{record.value}</span>
+                  </div>
+                ))}
               </div>
-              {totalLifetimeWeight !== null && (
-                <div className="flex items-center justify-between py-4 border-b border-[rgba(0,0,0,0.1)]">
-                  <span className="text-[20px] leading-[120%] text-[#000000]">lifetime volume</span>
-                  <span className="text-[20px] leading-[120%] text-[#000000]">{totalLifetimeWeight.toFixed(0)} kg</span>
-                </div>
-              )}
-              <div className="flex items-center justify-between py-4 border-[rgba(0,0,0,0.1)]">
-                <span className="text-[20px] leading-[120%] text-[#000000]">exercises completed</span>
-                <span className="text-[20px] leading-[120%] text-[#000000]">{Object.keys(completedSets).length}</span>
-              </div>
+            </div>
+          )}
+
+          <div className="flex-1"></div>
+
+          {/* Кнопка close внизу */}
+          <div className="fixed bottom-[10px] left-0 right-0 flex justify-center z-50">
+            <div className="w-full max-w-md px-[10px]">
+              <div
+                className="absolute inset-x-0 bottom-0 h-[200px] -z-10"
+                style={{
+                  backdropFilter: "blur(20px)",
+                  WebkitBackdropFilter: "blur(20px)",
+                  maskImage: "linear-gradient(to bottom, transparent 0%, black 100%)",
+                  WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 100%)",
+                }}
+              />
+              <Link href="/">
+                <button
+                  className="w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90"
+                >
+                  close
+                </button>
+              </Link>
             </div>
           </div>
         </div>
