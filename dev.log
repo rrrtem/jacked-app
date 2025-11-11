@@ -451,3 +451,4 @@ Error loading exercise: {
  GET /exercise/e50525e4-373b-48c3-be3f-940da9d301e7 200 in 453ms (compile: 2ms, proxy.ts: 127ms, render: 324ms)
  GET /exercise 200 in 671ms (compile: 134ms, proxy.ts: 148ms, render: 390ms)
  GET /login 200 in 405ms (compile: 126ms, proxy.ts: 147ms, render: 132ms)
+ ✓ Compiled in 122ms

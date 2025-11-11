@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 /**
  * Component that prevents screen from sleeping by playing an invisible video
@@ -8,7 +8,9 @@ import { useEffect, useRef } from "react"
  */
 export function KeepAwake({ enabled }: { enabled: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [hasUserInteracted, setHasUserInteracted] = useState(false)
 
+  // Try to start video when enabled changes
   useEffect(() => {
     if (!videoRef.current) return
 
@@ -24,6 +26,32 @@ export function KeepAwake({ enabled }: { enabled: boolean }) {
       video.pause()
     }
   }, [enabled])
+
+  // Ensure video starts on first user interaction (iOS requirement)
+  useEffect(() => {
+    if (!enabled || hasUserInteracted) return
+
+    const startVideoOnInteraction = () => {
+      if (videoRef.current) {
+        videoRef.current.play().catch((err) => {
+          console.log("Video play on interaction failed:", err)
+        })
+        setHasUserInteracted(true)
+      }
+    }
+
+    // Listen for any user interaction
+    const events = ['touchstart', 'click', 'keydown']
+    events.forEach(event => {
+      document.addEventListener(event, startVideoOnInteraction, { once: true })
+    })
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, startVideoOnInteraction)
+      })
+    }
+  }, [enabled, hasUserInteracted])
 
   // Handle visibility change - restart video when page becomes visible
   useEffect(() => {
