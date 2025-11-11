@@ -7,7 +7,8 @@ import { calculateSetSuggestion } from "@/lib/progression"
 import { getExerciseRecord } from "@/lib/supabase/queries"
 import type { SetSuggestion } from "@/lib/types/progression"
 
-import { useWakeLock } from "./useWakeLock"
+import { KeepAwake } from "./KeepAwake"
+import { WakeLockIndicator } from "./WakeLockIndicator"
 import { 
   fetchWarmupExercises, 
   enrichExercisesWithDbData, 
@@ -104,8 +105,8 @@ export default function WorkoutSession() {
   const [sessionWeight, setSessionWeight] = useState<number>(0)
   const [newRecords, setNewRecords] = useState<NewRecord[]>([])
 
-  // Enable wake lock to prevent screen from sleeping
-  useWakeLock(isWorkoutActive)
+  // Show indicator for developers (can be removed in production)
+  const showWakeLockIndicator = process.env.NODE_ENV === "development"
 
   /**
    * Load suggestion for current exercise and set
@@ -593,22 +594,36 @@ export default function WorkoutSession() {
     )
   }
 
+  // Components to keep screen awake during workout
+  const keepAwakeComponents = (
+    <>
+      {/* Invisible video fallback - works on all iOS versions */}
+      <KeepAwake enabled={isWorkoutActive} />
+      
+      {/* Wake Lock indicator (development only) */}
+      {showWakeLockIndicator && <WakeLockIndicator enabled={isWorkoutActive} />}
+    </>
+  )
+
   // Warmup Stage
   if (stage === "warmup") {
     const canShuffleWarmup = warmupExercisesPool.length > (warmupExercise ? 1 : 0)
 
     return (
-      <WarmupStage
-        totalTime={totalTime}
-        warmupTime={warmupTime}
-        warmupExercise={warmupExercise}
-        canShuffle={canShuffleWarmup}
-        isShuffleLoading={isWarmupShuffleLoading}
-        onCancel={cancelWorkout}
-        onFinish={finishWorkout}
-        onShuffle={handleShuffleWarmup}
-        onNext={() => setStage("exercise-warmup")}
-      />
+      <>
+        {keepAwakeComponents}
+        <WarmupStage
+          totalTime={totalTime}
+          warmupTime={warmupTime}
+          warmupExercise={warmupExercise}
+          canShuffle={canShuffleWarmup}
+          isShuffleLoading={isWarmupShuffleLoading}
+          onCancel={cancelWorkout}
+          onFinish={finishWorkout}
+          onShuffle={handleShuffleWarmup}
+          onNext={() => setStage("exercise-warmup")}
+        />
+      </>
     )
   }
 
@@ -622,7 +637,9 @@ export default function WorkoutSession() {
     }
 
     return (
-      <ExerciseStage
+      <>
+        {keepAwakeComponents}
+        <ExerciseStage
         totalTime={totalTime}
         exercise={currentExerciseData}
         currentSet={currentSet}
@@ -644,12 +661,18 @@ export default function WorkoutSession() {
         onSkipSet={() => {}}
         onNextExercise={handleNextExercise}
       />
+      </>
     )
   }
 
   // Rest Stage
   if (stage === "rest") {
-    return <RestStage totalTime={totalTime} restTime={restTime} onSkip={handleSkipRest} />
+    return (
+      <>
+        {keepAwakeComponents}
+        <RestStage totalTime={totalTime} restTime={restTime} onSkip={handleSkipRest} />
+      </>
+    )
   }
 
   // Working Set Stage
@@ -662,7 +685,9 @@ export default function WorkoutSession() {
     }
 
     return (
-      <ExerciseStage
+      <>
+        {keepAwakeComponents}
+        <ExerciseStage
         totalTime={totalTime}
         exercise={currentExerciseData}
         currentSet={currentSet}
@@ -684,13 +709,16 @@ export default function WorkoutSession() {
         onSkipSet={() => {}}
         onNextExercise={handleNextExercise}
       />
+      </>
     )
   }
 
   // Add Exercise Prompt Stage
   if (stage === "add-exercise-prompt") {
     return (
-      <AddExerciseStage
+      <>
+        {keepAwakeComponents}
+        <AddExerciseStage
         totalTime={totalTime}
         availableExercises={availableExercises}
         isLoadingExercises={isLoadingExercises}
@@ -701,6 +729,7 @@ export default function WorkoutSession() {
         onSelectExercise={addExerciseToWorkout}
         onFinish={finishWorkout}
       />
+      </>
     )
   }
 
