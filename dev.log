@@ -479,3 +479,105 @@ Error loading exercise: {
  GET /exercise 200 in 912ms (compile: 256ms, proxy.ts: 86ms, render: 570ms)
  GET / 200 in 95ms (compile: 6ms, proxy.ts: 69ms, render: 20ms)
  GET /exercise/f9cb731e-a689-452f-bc8a-8ee59cfa4d7c 200 in 436ms (compile: 12ms, proxy.ts: 66ms, render: 358ms)
+ GET /exercise 200 in 462ms (compile: 16ms, proxy.ts: 192ms, render: 255ms)
+ GET /exercise/60a423bb-3499-4205-96a4-38e76f8a2ff1 200 in 498ms (compile: 17ms, proxy.ts: 93ms, render: 387ms)
+ GET /exercise 200 in 341ms (compile: 7ms, proxy.ts: 68ms, render: 266ms)
+ GET / 200 in 93ms (compile: 7ms, proxy.ts: 71ms, render: 15ms)
+ ⨯ ./app/workout/[id]/page.tsx:11:1
+Module not found: Can't resolve './WakeLockIndicator'
+[0m [90m  9 |[39m
+ [90m 10 |[39m [36mimport[39m { [33mKeepAwake[39m } [36mfrom[39m [32m"./KeepAwake"[39m
+[31m[1m>[22m[39m[90m 11 |[39m [36mimport[39m { [33mWakeLockIndicator[39m } [36mfrom[39m [32m"./WakeLockIndicator"[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 12 |[39m [36mimport[39m { 
+ [90m 13 |[39m   fetchWarmupExercises[33m,[39m 
+ [90m 14 |[39m   enrichExercisesWithDbData[33m,[39m [0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/workout/[id]/page.tsx [Client Component Browser]
+    ./app/workout/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/workout/[id]/page.tsx [Client Component SSR]
+    ./app/workout/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./app/workout/[id]/page.tsx:11:1
+Module not found: Can't resolve './WakeLockIndicator'
+[0m [90m  9 |[39m
+ [90m 10 |[39m [36mimport[39m { [33mKeepAwake[39m } [36mfrom[39m [32m"./KeepAwake"[39m
+[31m[1m>[22m[39m[90m 11 |[39m [36mimport[39m { [33mWakeLockIndicator[39m } [36mfrom[39m [32m"./WakeLockIndicator"[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 12 |[39m [36mimport[39m { 
+ [90m 13 |[39m   fetchWarmupExercises[33m,[39m 
+ [90m 14 |[39m   enrichExercisesWithDbData[33m,[39m [0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/workout/[id]/page.tsx [Client Component Browser]
+    ./app/workout/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/workout/[id]/page.tsx [Client Component SSR]
+    ./app/workout/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./app/workout/[id]/page.tsx:11:1
+Module not found: Can't resolve './WakeLockIndicator'
+[0m [90m  9 |[39m
+ [90m 10 |[39m [36mimport[39m { [33mKeepAwake[39m } [36mfrom[39m [32m"./KeepAwake"[39m
+[31m[1m>[22m[39m[90m 11 |[39m [36mimport[39m { [33mWakeLockIndicator[39m } [36mfrom[39m [32m"./WakeLockIndicator"[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 12 |[39m [36mimport[39m { 
+ [90m 13 |[39m   fetchWarmupExercises[33m,[39m 
+ [90m 14 |[39m   enrichExercisesWithDbData[33m,[39m [0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/workout/[id]/page.tsx [Client Component Browser]
+    ./app/workout/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/workout/[id]/page.tsx [Client Component SSR]
+    ./app/workout/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ⨯ ./app/workout/[id]/page.tsx:11:1
+Module not found: Can't resolve './WakeLockIndicator'
+[0m [90m  9 |[39m
+ [90m 10 |[39m [36mimport[39m { [33mKeepAwake[39m } [36mfrom[39m [32m"./KeepAwake"[39m
+[31m[1m>[22m[39m[90m 11 |[39m [36mimport[39m { [33mWakeLockIndicator[39m } [36mfrom[39m [32m"./WakeLockIndicator"[39m
+ [90m    |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 12 |[39m [36mimport[39m { 
+ [90m 13 |[39m   fetchWarmupExercises[33m,[39m 
+ [90m 14 |[39m   enrichExercisesWithDbData[33m,[39m [0m
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/workout/[id]/page.tsx [Client Component Browser]
+    ./app/workout/[id]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/workout/[id]/page.tsx [Client Component SSR]
+    ./app/workout/[id]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+ ✓ Compiled in 25ms
+ GET / 200 in 271ms (compile: 5ms, proxy.ts: 243ms, render: 22ms)

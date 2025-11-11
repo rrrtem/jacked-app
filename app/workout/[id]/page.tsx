@@ -8,7 +8,6 @@ import { getExerciseRecord } from "@/lib/supabase/queries"
 import type { SetSuggestion } from "@/lib/types/progression"
 
 import { KeepAwake } from "./KeepAwake"
-import { WakeLockIndicator } from "./WakeLockIndicator"
 import { 
   fetchWarmupExercises, 
   enrichExercisesWithDbData, 
@@ -104,9 +103,6 @@ export default function WorkoutSession() {
   const [totalWorkouts, setTotalWorkouts] = useState<number | null>(null)
   const [sessionWeight, setSessionWeight] = useState<number>(0)
   const [newRecords, setNewRecords] = useState<NewRecord[]>([])
-
-  // Show indicator for developers (can be removed in production)
-  const showWakeLockIndicator = process.env.NODE_ENV === "development"
 
   /**
    * Load suggestion for current exercise and set
@@ -594,16 +590,8 @@ export default function WorkoutSession() {
     )
   }
 
-  // Components to keep screen awake during workout
-  const keepAwakeComponents = (
-    <>
-      {/* Invisible video fallback - works on all iOS versions */}
-      <KeepAwake enabled={isWorkoutActive} />
-      
-      {/* Wake Lock indicator (development only) */}
-      {showWakeLockIndicator && <WakeLockIndicator enabled={isWorkoutActive} />}
-    </>
-  )
+  // Component to keep screen awake during workout
+  const keepAwakeComponent = <KeepAwake enabled={isWorkoutActive} />
 
   // Warmup Stage
   if (stage === "warmup") {
@@ -611,7 +599,7 @@ export default function WorkoutSession() {
 
     return (
       <>
-        {keepAwakeComponents}
+        {keepAwakeComponent}
         <WarmupStage
           totalTime={totalTime}
           warmupTime={warmupTime}
@@ -638,7 +626,7 @@ export default function WorkoutSession() {
 
     return (
       <>
-        {keepAwakeComponents}
+        {keepAwakeComponent}
         <ExerciseStage
         totalTime={totalTime}
         exercise={currentExerciseData}
@@ -669,7 +657,7 @@ export default function WorkoutSession() {
   if (stage === "rest") {
     return (
       <>
-        {keepAwakeComponents}
+        {keepAwakeComponent}
         <RestStage totalTime={totalTime} restTime={restTime} onSkip={handleSkipRest} />
       </>
     )
@@ -686,7 +674,7 @@ export default function WorkoutSession() {
 
     return (
       <>
-        {keepAwakeComponents}
+        {keepAwakeComponent}
         <ExerciseStage
         totalTime={totalTime}
         exercise={currentExerciseData}
@@ -717,7 +705,7 @@ export default function WorkoutSession() {
   if (stage === "add-exercise-prompt") {
     return (
       <>
-        {keepAwakeComponents}
+        {keepAwakeComponent}
         <AddExerciseStage
         totalTime={totalTime}
         availableExercises={availableExercises}
