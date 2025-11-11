@@ -453,3 +453,11 @@ Error loading exercise: {
  GET /login 200 in 405ms (compile: 126ms, proxy.ts: 147ms, render: 132ms)
  ✓ Compiled in 122ms
  ✓ Compiled in 101ms
+ GET / 200 in 373ms (compile: 135ms, proxy.ts: 166ms, render: 71ms)
+ GET /start 200 in 286ms (compile: 111ms, proxy.ts: 139ms, render: 36ms)
+ GET /workout/1762904264694-q4btukukw 200 in 389ms (compile: 141ms, proxy.ts: 105ms, render: 142ms)
+ ✓ Compiled in 132ms
+ ✓ Compiled in 32ms
+ ✓ Compiled in 24ms
+ ✓ Compiled in 95ms
+ ✓ Compiled in 52ms
