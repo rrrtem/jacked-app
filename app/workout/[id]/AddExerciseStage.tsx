@@ -65,7 +65,7 @@ export function AddExerciseStage({
 
         <div className="flex-1"></div>
 
-        <div className="fixed bottom-[15px] left-0 right-0 flex justify-center z-50">
+        <div className="fixed bottom-[25px] left-0 right-0 flex justify-center z-50">
           <div className="w-full max-w-md px-[10px]">
             <div
               className="absolute inset-x-0 bottom-0 h-[200px] -z-10"

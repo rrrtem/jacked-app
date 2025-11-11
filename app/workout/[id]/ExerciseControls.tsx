@@ -202,7 +202,7 @@ export function ExerciseControls({
   }
 
   const bottomWrapperClasses = `${
-    isEditingValues ? "relative" : "fixed bottom-[15px]"
+    isEditingValues ? "relative" : "fixed bottom-[25px]"
   } left-0 right-0 flex justify-center pointer-events-none z-50`
 
   return (
