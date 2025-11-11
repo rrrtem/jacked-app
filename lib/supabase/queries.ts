@@ -805,6 +805,19 @@ export async function getProgressChartData(
 }
 
 /**
+ * Удалить запись из истории рекордов
+ */
+export async function deleteRecordFromHistory(recordId: string) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('exercise_record_history')
+    .delete()
+    .eq('id', recordId)
+
+  if (error) throw error
+}
+
+/**
  * Удалить тренировочную сессию
  */
 export async function deleteWorkoutSession(sessionId: string) {

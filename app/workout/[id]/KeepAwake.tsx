@@ -1,86 +1,108 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import NoSleep from "nosleep.js"
 
 /**
- * Component that prevents screen from sleeping by playing an invisible video
- * This is a fallback/reliable solution that works on all iOS versions
+ * Component that prevents screen from sleeping
+ * Uses NoSleep.js library which has multiple fallback strategies for iOS
  */
 export function KeepAwake({ enabled }: { enabled: boolean }) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const noSleepRef = useRef<NoSleep | null>(null)
   const [hasUserInteracted, setHasUserInteracted] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
+  const [isActive, setIsActive] = useState(false)
   const [lastCheck, setLastCheck] = useState<string>("")
+  const [error, setError] = useState<string>("")
 
-  // Aggressive video start on mount and when enabled
+  // Initialize NoSleep instance
   useEffect(() => {
-    if (!videoRef.current) return
+    if (typeof window === "undefined") return
+    
+    try {
+      noSleepRef.current = new NoSleep()
+      console.log("✅ NoSleep initialized")
+    } catch (err) {
+      console.error("❌ Failed to initialize NoSleep:", err)
+      setError("Init failed")
+    }
 
-    const video = videoRef.current
-
-    if (enabled) {
-      // Try to start immediately
-      const attemptPlay = () => {
-        video.play()
-          .then(() => {
-            console.log("✅ KeepAwake: Video started successfully")
-          })
-          .catch((err) => {
-            console.log("⚠️ KeepAwake: Video play failed, will retry on interaction:", err.message)
-          })
+    return () => {
+      if (noSleepRef.current?.isEnabled) {
+        noSleepRef.current.disable()
       }
+    }
+  }, [])
 
-      attemptPlay()
-      
-      // Also try after a short delay
-      const timeout = setTimeout(attemptPlay, 100)
-      
-      return () => clearTimeout(timeout)
-    } else {
-      video.pause()
-      console.log("⏸️ KeepAwake: Video paused")
+  // Enable/disable NoSleep based on enabled prop
+  useEffect(() => {
+    if (!noSleepRef.current) return
+
+    if (enabled && !noSleepRef.current.isEnabled) {
+      // Try to enable immediately (might fail without user interaction)
+      noSleepRef.current.enable()
+        .then(() => {
+          console.log("✅ NoSleep enabled successfully")
+          setIsActive(true)
+          setLastCheck(new Date().toLocaleTimeString())
+        })
+        .catch((err) => {
+          console.log("⚠️ NoSleep enable failed, waiting for user interaction:", err.message)
+          setError("Need tap")
+        })
+    } else if (!enabled && noSleepRef.current.isEnabled) {
+      noSleepRef.current.disable()
+      setIsActive(false)
+      console.log("⏸️ NoSleep disabled")
     }
   }, [enabled])
 
-  // Ensure video starts on ANY user interaction (iOS requirement)
+  // Enable NoSleep on first user interaction
   useEffect(() => {
-    if (!enabled || hasUserInteracted) return
+    if (!enabled || hasUserInteracted || !noSleepRef.current) return
 
-    const startVideoOnInteraction = () => {
-      if (videoRef.current) {
-        videoRef.current.play()
-          .then(() => {
-            console.log("✅ KeepAwake: Video started on user interaction")
-            setHasUserInteracted(true)
-          })
-          .catch((err) => {
-            console.log("❌ KeepAwake: Failed to start video on interaction:", err.message)
-          })
-      }
+    const enableOnInteraction = () => {
+      if (!noSleepRef.current) return
+
+      noSleepRef.current.enable()
+        .then(() => {
+          console.log("✅ NoSleep enabled on user interaction")
+          setHasUserInteracted(true)
+          setIsActive(true)
+          setLastCheck(new Date().toLocaleTimeString())
+          setError("")
+        })
+        .catch((err) => {
+          console.error("❌ Failed to enable NoSleep on interaction:", err)
+          setError("Failed to enable")
+        })
     }
 
     // Listen for ANY user interaction
     const events = ['touchstart', 'touchend', 'click', 'keydown', 'mousedown']
     events.forEach(event => {
-      document.addEventListener(event, startVideoOnInteraction, { once: true, passive: true })
+      document.addEventListener(event, enableOnInteraction, { once: true, passive: true })
     })
 
     return () => {
       events.forEach(event => {
-        document.removeEventListener(event, startVideoOnInteraction)
+        document.removeEventListener(event, enableOnInteraction)
       })
     }
   }, [enabled, hasUserInteracted])
 
-  // Handle visibility change - restart video when page becomes visible
+  // Handle visibility change
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || !noSleepRef.current) return
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && videoRef.current) {
-        videoRef.current.play()
-          .then(() => console.log("✅ KeepAwake: Video restarted after visibility change"))
-          .catch((err) => console.log("⚠️ KeepAwake: Failed to restart video:", err.message))
+      if (document.visibilityState === "visible" && noSleepRef.current && !noSleepRef.current.isEnabled) {
+        noSleepRef.current.enable()
+          .then(() => {
+            console.log("✅ NoSleep re-enabled after visibility change")
+            setIsActive(true)
+            setLastCheck(new Date().toLocaleTimeString())
+          })
+          .catch((err) => console.log("⚠️ Failed to re-enable NoSleep:", err.message))
       }
     }
 
@@ -91,64 +113,22 @@ export function KeepAwake({ enabled }: { enabled: boolean }) {
     }
   }, [enabled])
 
-  // Keep video alive with periodic checks
+  // Periodic status check
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || !noSleepRef.current) return
 
-    const keepAlive = setInterval(() => {
-      if (videoRef.current && videoRef.current.paused) {
-        console.log("🔄 KeepAwake: Video paused, restarting...")
-        videoRef.current.play().catch((err) => {
-          console.log("⚠️ KeepAwake: Periodic restart failed:", err.message)
-        })
+    const checkStatus = setInterval(() => {
+      if (noSleepRef.current?.isEnabled) {
+        setLastCheck(new Date().toLocaleTimeString())
       }
-    }, 5000) // Check every 5 seconds
+    }, 10000) // Update every 10 seconds
 
-    return () => clearInterval(keepAlive)
+    return () => clearInterval(checkStatus)
   }, [enabled])
-
-  // Minimal 1-second black video encoded as base64 (very small file)
-  // This is a 1x1 pixel, 1 second, silent video
-  const videoDataUrl = "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAu1tZGF0AAACrQYF//+p3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE1MiByMjg1NCBlOWE1OTAzIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNyAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTYgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAA2mWIhAA3//728P4FNjuZQQmiHCN2QAAAAwAAAwAAJgn0IQBBk2AAALQAAAMAAAMAACoCAA+CAAAARkGaJGxDP/6eEAAAHEAAAAKgAAAACKhgAAAP4PIAAA0wFIQBDcAA//v+95dv74//8SAjCYhAAPz/AL4AvsC+AAA="
 
   return (
     <>
-      <video
-        ref={videoRef}
-        src={videoDataUrl}
-        autoPlay
-        loop
-        muted
-        playsInline
-        preload="auto"
-        // @ts-ignore - webkit prefix for older iOS
-        webkit-playsinline="true"
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "1px",
-          height: "1px",
-          opacity: 0,
-          pointerEvents: "none",
-          zIndex: -1,
-        }}
-        aria-hidden="true"
-        onPlay={() => {
-          console.log("🎬 KeepAwake: Video playing")
-          setIsPlaying(true)
-          setLastCheck(new Date().toLocaleTimeString())
-        }}
-        onPause={() => {
-          console.log("⏸️ KeepAwake: Video paused")
-          setIsPlaying(false)
-        }}
-        onEnded={() => {
-          console.log("🔁 KeepAwake: Video ended (should loop)")
-        }}
-      />
-      
-      {/* Debug indicator - shows video status */}
+      {/* Debug indicator - shows NoSleep status */}
       {enabled && (
         <div
           style={{
@@ -162,27 +142,29 @@ export function KeepAwake({ enabled }: { enabled: boolean }) {
             fontFamily: "monospace",
             fontWeight: "bold",
             zIndex: 9999,
-            backgroundColor: isPlaying 
+            backgroundColor: isActive 
               ? "rgba(0, 255, 0, 0.15)" 
               : hasUserInteracted 
                 ? "rgba(255, 165, 0, 0.15)"
                 : "rgba(255, 0, 0, 0.15)",
-            color: isPlaying 
+            color: isActive 
               ? "#00ff00" 
               : hasUserInteracted 
                 ? "#ffa500"
                 : "#ff0000",
-            border: `1px solid ${isPlaying ? "#00ff00" : hasUserInteracted ? "#ffa500" : "#ff0000"}`,
+            border: `1px solid ${isActive ? "#00ff00" : hasUserInteracted ? "#ffa500" : "#ff0000"}`,
             boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
             pointerEvents: "none",
           }}
         >
-          {isPlaying ? (
+          {isActive ? (
             <>🔒 AWAKE {lastCheck && `(${lastCheck})`}</>
+          ) : error ? (
+            <>❌ {error.toUpperCase()}</>
           ) : hasUserInteracted ? (
-            <>⚠️ PAUSED - TAP SCREEN</>
+            <>⚠️ PAUSED - TAP AGAIN</>
           ) : (
-            <>❌ WAITING - TAP SCREEN</>
+            <>❌ TAP SCREEN TO START</>
           )}
         </div>
       )}

@@ -461,3 +461,21 @@ Error loading exercise: {
  ✓ Compiled in 24ms
  ✓ Compiled in 95ms
  ✓ Compiled in 52ms
+ GET /login 200 in 541ms (compile: 15ms, proxy.ts: 450ms, render: 77ms)
+ GET / 200 in 175ms (compile: 7ms, proxy.ts: 94ms, render: 74ms)
+ GET /exercise/e50525e4-373b-48c3-be3f-940da9d301e7 200 in 428ms (compile: 16ms, proxy.ts: 64ms, render: 348ms)
+ ✓ Compiled in 112ms
+ GET /login 200 in 443ms (compile: 7ms, proxy.ts: 138ms, render: 298ms)
+ GET /exercise/e50525e4-373b-48c3-be3f-940da9d301e7 200 in 525ms (compile: 178ms, proxy.ts: 153ms, render: 194ms)
+ GET /login 200 in 117ms (compile: 5ms, proxy.ts: 81ms, render: 31ms)
+ GET /exercise/e50525e4-373b-48c3-be3f-940da9d301e7 200 in 369ms (compile: 17ms, proxy.ts: 124ms, render: 228ms)
+ ✓ Compiled in 77ms
+ GET /exercise/e50525e4-373b-48c3-be3f-940da9d301e7 200 in 737ms (compile: 152ms, proxy.ts: 124ms, render: 461ms)
+ ✓ Compiled in 68ms
+ GET /exercise 200 in 523ms (compile: 115ms, proxy.ts: 81ms, render: 328ms)
+ ✓ Compiled in 181ms
+ ✓ Compiled in 691ms
+ GET /exercise/18e96dd3-7a79-47d4-9d23-1166ba2fc6d7 200 in 756ms (compile: 137ms, proxy.ts: 113ms, render: 506ms)
+ GET /exercise 200 in 912ms (compile: 256ms, proxy.ts: 86ms, render: 570ms)
+ GET / 200 in 95ms (compile: 6ms, proxy.ts: 69ms, render: 20ms)
+ GET /exercise/f9cb731e-a689-452f-bc8a-8ee59cfa4d7c 200 in 436ms (compile: 12ms, proxy.ts: 66ms, render: 358ms)
