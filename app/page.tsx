@@ -468,7 +468,7 @@ export default function WorkoutTracker() {
         </div>
 
         {/* New Workout Button */}
-        <div className="fixed bottom-[10px] left-0 right-0 flex justify-center pointer-events-none z-50">
+        <div className="fixed bottom-[25px] left-0 right-0 flex justify-center pointer-events-none z-50">
           <div className="w-full max-w-md px-[10px] pointer-events-auto">
             <div
               className="absolute inset-x-0 bottom-0 h-[150px] -z-10"

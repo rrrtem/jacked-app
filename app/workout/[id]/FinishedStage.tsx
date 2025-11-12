@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { formatTime } from "./utils"
 import type { NewRecord } from "./types"
+import { clearAIGeneration } from "@/lib/ai-suggest/storage"
 
 type FinishedStageProps = {
   totalTime: number
@@ -77,7 +78,10 @@ export function FinishedStage({
               }}
             />
             <Link href="/">
-              <button className="w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90">
+              <button 
+                onClick={() => clearAIGeneration()}
+                className="w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90"
+              >
                 close
               </button>
             </Link>

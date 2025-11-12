@@ -89,6 +89,9 @@ export default function StartWorkout() {
   const [showPreferencesModal, setShowPreferencesModal] = useState(false)
   const [userPreferences, setUserPreferences] = useState("")
   const [savingPreferences, setSavingPreferences] = useState(false)
+  
+  // AI Rate limits
+  const [aiRateLimit, setAiRateLimit] = useState<{ remaining: number; limit: number } | null>(null)
 
   const supabaseClientRef = useRef(createClient())
 
@@ -275,9 +278,11 @@ export default function StartWorkout() {
     setSwipedExerciseId(null)
     setSwipeDistance(0)
     
-    // Load user preferences when switching to AI suggested tab
+    // Load user preferences and rate limit when switching to AI suggested tab
     if (activePreset === 'ai-suggested') {
       loadUserPreferences()
+      loadAIRateLimit()
+      loadAIGenerationFromStorage()
     }
   }, [activePreset])
 
@@ -583,6 +588,61 @@ export default function StartWorkout() {
     }
   }
   
+  // Load AI rate limit status
+  const loadAIRateLimit = async () => {
+    try {
+      const response = await fetch('/api/ai-limit-status')
+      if (response.ok) {
+        const data = await response.json()
+        setAiRateLimit({ remaining: data.remaining, limit: data.limit })
+      }
+    } catch (error) {
+      console.error('Error loading AI rate limit:', error)
+    }
+  }
+  
+  // Save AI generation to localStorage
+  const saveAIGenerationToStorage = (exercises: Exercise[], reasoning: string, context: string) => {
+    try {
+      const generation = {
+        exercises,
+        reasoning,
+        context,
+        timestamp: Date.now()
+      }
+      localStorage.setItem('ai-workout-generation', JSON.stringify(generation))
+    } catch (error) {
+      console.error('Error saving AI generation:', error)
+    }
+  }
+  
+  // Load AI generation from localStorage
+  const loadAIGenerationFromStorage = () => {
+    try {
+      const stored = localStorage.getItem('ai-workout-generation')
+      if (!stored) return
+      
+      const generation = JSON.parse(stored)
+      // Only load if generated within last 24 hours
+      if (Date.now() - generation.timestamp < 24 * 60 * 60 * 1000) {
+        setAiSuggestedExercises(generation.exercises)
+        setAiOverallReasoning(generation.reasoning)
+        setAiLocalContext(generation.context)
+      }
+    } catch (error) {
+      console.error('Error loading AI generation:', error)
+    }
+  }
+  
+  // Clear AI generation (only after workout completion)
+  const clearAIGeneration = () => {
+    localStorage.removeItem('ai-workout-generation')
+    setAiSuggestedExercises([])
+    setAiOverallReasoning("")
+    setAiLocalContext("")
+    setAiAdjustmentContext("")
+  }
+  
   // Save user preferences to database
   const handleSavePreferences = async () => {
     setSavingPreferences(true)
@@ -639,6 +699,16 @@ export default function StartWorkout() {
       
       if (!response.ok) {
         const errorData = await response.json()
+        
+        // Handle rate limit error specially
+        if (response.status === 429) {
+          if (errorData.remaining !== undefined && errorData.limit !== undefined) {
+            setAiRateLimit({ remaining: errorData.remaining, limit: errorData.limit })
+          }
+          alert(`Daily AI request limit reached (${errorData.limit} requests per day).\n\nYour limit will reset in 24 hours.`)
+          return
+        }
+        
         throw new Error(errorData.error || 'Failed to generate workout')
       }
       
@@ -670,9 +740,18 @@ export default function StartWorkout() {
       setAiOverallReasoning(result.data.overallReasoning)
       setAiAdjustmentContext("") // Clear adjustment input after successful generation
       
+      // Save to localStorage
+      saveAIGenerationToStorage(exercises, result.data.overallReasoning, contextToSend)
+      
+      // Update rate limit display
+      if (result.rateLimit) {
+        setAiRateLimit(result.rateLimit)
+      }
+      
       console.log('✅ AI workout generated:', {
         exercises: exercises.length,
-        reasoning: result.data.overallReasoning
+        reasoning: result.data.overallReasoning,
+        rateLimit: result.rateLimit
       })
     } catch (error) {
       console.error('Error generating workout:', error)
@@ -1065,7 +1144,7 @@ export default function StartWorkout() {
         </div>
 
         {/* Fixed Bottom Button Area */}
-        <div className="fixed bottom-[10px] left-0 right-0 flex justify-center pointer-events-none z-50">
+        <div className="fixed bottom-[25px] left-0 right-0 flex justify-center pointer-events-none z-50">
           <div className="w-full max-w-md px-[10px] pointer-events-auto">
             <div
               className="absolute inset-x-0 bottom-0 h-[200px] -z-10"
@@ -1081,11 +1160,16 @@ export default function StartWorkout() {
               {/* AI Input + Generate Button (shown when no workout generated yet) */}
               {isAISuggested && aiSuggestedExercises.length === 0 && !aiLoading && (
                 <>
-                  {/* User Preferences Link above input, aligned right */}
-                  <div className="flex justify-end mb-2">
+                  {/* User Preferences Link + AI Limit Counter */}
+                  <div className="flex justify-between items-center mb-2">
+                    {aiRateLimit && (
+                      <div className="text-[14px] leading-[140%] text-[rgba(0,0,0,0.6)]">
+                        {aiRateLimit.remaining}/{aiRateLimit.limit}
+                      </div>
+                    )}
                     <button
                       onClick={() => setShowPreferencesModal(true)}
-                      className="text-[14px] leading-[140%] text-[rgba(0,0,0,0.6)] underline hover:text-[#000000] transition-colors"
+                      className="text-[14px] leading-[140%] text-[rgba(0,0,0,0.6)] underline hover:text-[#000000] transition-colors ml-auto"
                     >
                       edit preferences
                     </button>
@@ -1126,7 +1210,7 @@ export default function StartWorkout() {
                       }
                     }}
                     placeholder="type to adjust your workout"
-                    className="w-full bg-[#ffffff] text-[#000000] py-4 pl-4 pr-12 rounded-[60px] text-[16px] leading-[120%] font-normal border-2 border-[#000000] outline-none focus:bg-[#f7f7f7] transition-colors placeholder:text-[rgba(0,0,0,0.3)]"
+                    className="w-full bg-[#ffffff] text-[#6A6A6A] py-5 pl-4 pr-12 rounded-[60px] text-[16px] leading-[120%] font-normal border-[0.5px] border-[#6A6A6A] outline-none focus:border-[#000000] transition-colors placeholder:text-[#6A6A6A]/60"
                   />
                   <button
                     onClick={() => {
@@ -1135,7 +1219,7 @@ export default function StartWorkout() {
                       }
                     }}
                     disabled={!aiAdjustmentContext.trim()}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[rgba(0,0,0,0.3)] hover:text-[#000000] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6A6A6A] hover:text-[#000000] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Adjust workout"
                   >
                     <Mic className="w-5 h-5" />

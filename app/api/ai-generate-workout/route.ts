@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateWorkoutWithLLM, validateGeneratedWorkout } from '@/lib/ai-suggest/llm-generator'
 import type { WorkoutGenerationContext, DbExercise, WorkoutHistoryEntry } from '@/lib/ai-suggest/prompt-builder'
+import { checkAndIncrementAILimit } from '@/lib/ai-suggest/rate-limiter'
 
 export async function POST(request: Request) {
   console.log('🔵 AI Generate Workout API called')
@@ -29,14 +30,33 @@ export async function POST(request: Request) {
     
     console.log('✅ User authenticated:', user.id)
 
+    // Check rate limit
+    console.log('3️⃣ Checking AI request rate limit...')
+    const rateLimitStatus = await checkAndIncrementAILimit(supabase, user.id)
+    
+    if (!rateLimitStatus.allowed) {
+      console.log('❌ Rate limit exceeded:', rateLimitStatus)
+      return NextResponse.json(
+        { 
+          error: 'Daily AI request limit reached',
+          remaining: rateLimitStatus.remaining,
+          limit: rateLimitStatus.limit,
+          resetAt: rateLimitStatus.resetAt
+        },
+        { status: 429 }
+      )
+    }
+    
+    console.log('✅ Rate limit OK:', `${rateLimitStatus.remaining}/${rateLimitStatus.limit} remaining`)
+
     // Parse request body
-    console.log('3️⃣ Parsing request body...')
+    console.log('4️⃣ Parsing request body...')
     const body = await request.json()
     const { localContext } = body as { localContext: string }
     console.log('Local context:', localContext || '(empty)')
 
     // 1. Get user preferences
-    console.log('4️⃣ Fetching user preferences...')
+    console.log('5️⃣ Fetching user preferences...')
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('training_preferences')
@@ -51,7 +71,7 @@ export async function POST(request: Request) {
     console.log('User preferences:', userPreferences ? 'Set' : 'None')
 
     // 2. Get workout history (last 2 weeks)
-    console.log('5️⃣ Fetching workout history...')
+    console.log('6️⃣ Fetching workout history...')
     const twoWeeksAgo = new Date()
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
 
@@ -113,7 +133,7 @@ export async function POST(request: Request) {
     })
 
     // 3. Get all available exercises
-    console.log('6️⃣ Fetching exercises from database...')
+    console.log('7️⃣ Fetching exercises from database...')
     const { data: exercises, error: exercisesError } = await supabase
       .from('exercises')
       .select('id, name, instructions, exercise_type, movement_pattern, muscle_group')
@@ -151,7 +171,7 @@ export async function POST(request: Request) {
     })
 
     // 4. Build context and generate workout
-    console.log('7️⃣ Building context for LLM...')
+    console.log('8️⃣ Building context for LLM...')
     const context: WorkoutGenerationContext = {
       workoutHistory,
       userPreferences,
@@ -166,12 +186,12 @@ export async function POST(request: Request) {
       exercisesCount: availableExercises.length
     })
 
-    console.log('8️⃣ Calling LLM to generate workout...')
+    console.log('9️⃣ Calling LLM to generate workout...')
     const result = await generateWorkoutWithLLM(context)
     console.log('✅ LLM generation complete!')
 
     // 5. Validate result
-    console.log('9️⃣ Validating generated workout...')
+    console.log('🔟 Validating generated workout...')
     const isValid = validateGeneratedWorkout(result, availableExercises)
     
     if (!isValid) {
@@ -188,7 +208,11 @@ export async function POST(request: Request) {
     console.log('🎉 Returning successful response')
     return NextResponse.json({
       success: true,
-      data: result
+      data: result,
+      rateLimit: {
+        remaining: rateLimitStatus.remaining,
+        limit: rateLimitStatus.limit
+      }
     })
 
   } catch (error) {

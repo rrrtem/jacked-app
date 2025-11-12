@@ -20,6 +20,9 @@
 | `total_weight_lifted` | DECIMAL | Общий поднятый вес (кг) (по умолчанию 0) |
 | `progression_config` | TEXT | ID конфигурации логики прогрессии (по умолчанию 'standard-linear') |
 | `training_preferences` | TEXT | Свободное текстовое поле для описания подхода к тренировкам |
+| `ai_daily_limit` | INTEGER | Дневной лимит AI запросов на генерацию тренировок (по умолчанию 3) |
+| `ai_requests_count` | INTEGER | Количество использованных AI запросов сегодня (по умолчанию 0) |
+| `ai_requests_reset_at` | TIMESTAMPTZ | Дата последнего сброса счетчика AI запросов |
 | `created_at` | TIMESTAMPTZ | Дата создания |
 | `updated_at` | TIMESTAMPTZ | Дата обновления |
 
