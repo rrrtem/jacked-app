@@ -12,13 +12,13 @@ import { ExerciseSelector } from "@/components/ExerciseSelector"
 import { 
   addExerciseToWorkoutSet, 
   removeExerciseFromWorkoutSet,
-  createWorkoutSet,
-  getWorkoutHistoryForAI
+  createWorkoutSet
 } from "@/lib/supabase/queries"
-import {
-  getAISuggestedWorkout,
-  mapSupabaseToAIHistory,
-} from "@/lib/ai-suggest"
+// Legacy AI suggest imports (not used in new LLM-based system)
+// import {
+//   getAISuggestedWorkout,
+//   mapSupabaseToAIHistory,
+// } from "@/lib/ai-suggest"
 
 type Exercise = {
   id: string
@@ -81,6 +81,14 @@ export default function StartWorkout() {
   // Упражнения для AI suggested preset (не сохраняются в БД пока)
   const [aiSuggestedExercises, setAiSuggestedExercises] = useState<Exercise[]>([])
   const [aiLoading, setAiLoading] = useState(false)
+  const [aiLocalContext, setAiLocalContext] = useState("")
+  const [aiOverallReasoning, setAiOverallReasoning] = useState("")
+  const [aiAdjustmentContext, setAiAdjustmentContext] = useState("")
+  
+  // User preferences modal
+  const [showPreferencesModal, setShowPreferencesModal] = useState(false)
+  const [userPreferences, setUserPreferences] = useState("")
+  const [savingPreferences, setSavingPreferences] = useState(false)
 
   const supabaseClientRef = useRef(createClient())
 
@@ -267,9 +275,9 @@ export default function StartWorkout() {
     setSwipedExerciseId(null)
     setSwipeDistance(0)
     
-    // Загружаем AI Suggested при переключении на этот таб
-    if (activePreset === 'ai-suggested' && aiSuggestedExercises.length === 0) {
-      loadAISuggested()
+    // Load user preferences when switching to AI suggested tab
+    if (activePreset === 'ai-suggested') {
+      loadUserPreferences()
     }
   }, [activePreset])
 
@@ -279,19 +287,21 @@ export default function StartWorkout() {
     ? {
         id: 'ai-suggested',
         label: 'ai suggested',
-        exercises: [
-          {
-            id: 'warmup-ai',
-            exerciseId: null,
-            name: "warm up",
-            sets: null,
-            warmupTime: "10:00",
-            exercise_type: 'warmup' as const,
-            movement_pattern: 'complex' as const,
-            muscle_group: 'full_body' as const,
-          },
-          ...aiSuggestedExercises
-        ]
+        exercises: aiSuggestedExercises.length > 0 
+          ? [
+              {
+                id: 'warmup-ai',
+                exerciseId: null,
+                name: "warm up",
+                sets: null,
+                warmupTime: "10:00",
+                exercise_type: 'warmup' as const,
+                movement_pattern: 'complex' as const,
+                muscle_group: 'full_body' as const,
+              },
+              ...aiSuggestedExercises
+            ]
+          : [] // No warmup if not generated yet
       }
     : activePreset ? presets.find((p) => p.id === activePreset) : undefined
   
@@ -549,8 +559,33 @@ export default function StartWorkout() {
   }
   
   // Загрузка AI Suggested упражнений
-  const loadAISuggested = async () => {
-    setAiLoading(true)
+  // Load user preferences from database
+  const loadUserPreferences = async () => {
+    try {
+      const supabase = supabaseClientRef.current
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      
+      if (!session?.user) return
+      
+      const { data } = await supabase
+        .from('users')
+        .select('training_preferences')
+        .eq('id', session.user.id)
+        .single()
+      
+      if (data?.training_preferences) {
+        setUserPreferences(data.training_preferences)
+      }
+    } catch (error) {
+      console.error('Error loading user preferences:', error)
+    }
+  }
+  
+  // Save user preferences to database
+  const handleSavePreferences = async () => {
+    setSavingPreferences(true)
     try {
       const supabase = supabaseClientRef.current
       const {
@@ -558,60 +593,101 @@ export default function StartWorkout() {
       } = await supabase.auth.getSession()
       
       if (!session?.user) {
-        console.log('No user session for AI suggested')
-        setAiLoading(false)
+        console.error('No user session')
         return
       }
       
-      // 1. Загружаем все упражнения из БД
-      const { data: dbExercises } = await supabase
-        .from('exercises')
-        .select('id, name, instructions, exercise_type, movement_pattern, muscle_group')
+      const { error } = await supabase
+        .from('users')
+        .update({ training_preferences: userPreferences || null })
+        .eq('id', session.user.id)
       
-      if (!dbExercises || dbExercises.length === 0) {
-        console.error('No exercises found in DB')
-        setAiLoading(false)
+      if (error) {
+        console.error('Error saving preferences:', error)
         return
       }
       
-      // 2. Получаем историю тренировок из БД (последние 14 дней)
-      const supabaseHistory = await getWorkoutHistoryForAI(session.user.id, 14)
-      
-      // 3. Преобразуем в формат для AI
-      const history = mapSupabaseToAIHistory(supabaseHistory)
-      
-      // 4. Генерируем рекомендации (с кешированием)
-      const suggested = getAISuggestedWorkout(history, dbExercises)
-      
-      // 5. Преобразуем в формат Exercise для UI
-      const exercises: Exercise[] = suggested.exercises.map((ex, idx) => {
-        // Находим полные данные упражнения в БД
-        const dbEx = dbExercises.find(e => e.id === ex.exerciseId)
-        
-        if (!dbEx) {
-          console.warn(`Exercise not found in DB: ${ex.name} (ID: ${ex.exerciseId})`)
-        }
-        
-        return {
-          id: `ai-${idx}-${Date.now()}`,
-          exerciseId: dbEx?.id || ex.exerciseId,
-          name: dbEx?.name || ex.name,
-          sets: ex.suggestedSets,
-          instructions: dbEx?.instructions || undefined,
-          exercise_type: dbEx?.exercise_type || 'weight',
-          movement_pattern: dbEx?.movement_pattern || 'complex',
-          muscle_group: dbEx?.muscle_group || 'chest',
-        }
+      setShowPreferencesModal(false)
+    } catch (error) {
+      console.error('Error saving preferences:', error)
+    } finally {
+      setSavingPreferences(false)
+    }
+  }
+  
+  // Generate workout using LLM
+  const handleGenerateWorkout = async (adjustmentContext?: string) => {
+    setAiLoading(true)
+    setAiSuggestedExercises([]) // Clear previous results
+    setAiOverallReasoning("")
+    
+    // Combine contexts if adjusting
+    const contextToSend = adjustmentContext 
+      ? `${aiLocalContext}\n\nAdjustment: ${adjustmentContext}`
+      : aiLocalContext
+    
+    try {
+      const response = await fetch('/api/ai-generate-workout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          localContext: contextToSend,
+        }),
       })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to generate workout')
+      }
+      
+      const result = await response.json()
+      
+      if (!result.success || !result.data) {
+        throw new Error('Invalid response from server')
+      }
+      
+      // Transform result to Exercise format for UI
+      const exercises: Exercise[] = result.data.exercises.map((ex: {
+        exerciseId: string
+        name: string
+        reasoning: string
+        suggestedSets: number
+        suggestedReps: string
+        suggestedRestSeconds: number
+      }, idx: number) => ({
+        id: `ai-${idx}-${Date.now()}`,
+        exerciseId: ex.exerciseId,
+        name: ex.name,
+        sets: ex.suggestedSets,
+        exercise_type: 'weight',
+        movement_pattern: 'complex',
+        muscle_group: 'chest',
+      }))
       
       setAiSuggestedExercises(exercises)
+      setAiOverallReasoning(result.data.overallReasoning)
+      setAiAdjustmentContext("") // Clear adjustment input after successful generation
       
-      console.log('✅ AI Suggested loaded:', {
+      console.log('✅ AI workout generated:', {
         exercises: exercises.length,
-        basedOn: suggested.basedOnWorkoutCount
+        reasoning: result.data.overallReasoning
       })
     } catch (error) {
-      console.error('Error loading AI suggested:', error)
+      console.error('Error generating workout:', error)
+      
+      // Show detailed error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to generate workout. Please try again.'
+      
+      // Create a more user-friendly error display
+      const errorDetails = error instanceof Error && error.message.includes('GEMINI_API_KEY')
+        ? '\n\nPlease add NEXT_PUBLIC_GEMINI_API_KEY to your .env.local file.\nSee ENV_SETUP_INSTRUCTIONS.md for details.'
+        : ''
+      
+      alert(errorMessage + errorDetails)
     } finally {
       setAiLoading(false)
     }
@@ -839,10 +915,30 @@ export default function StartWorkout() {
 
         {/* Exercise List */}
         <div className={`space-y-0 mb-[200px] ${!isAISuggested && "border-t border-[rgba(0,0,0,0.1)]"}`}>
+          {/* AI Suggested - no content at top, everything is at bottom */}
+          
           {/* AI Loading State */}
           {isAISuggested && aiLoading && (
             <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
-              generating workout...
+              <div className="animate-pulse">generating workout...</div>
+              <div className="text-[12px] mt-2">analyzing your training data</div>
+            </div>
+          )}
+          
+          {/* AI Generated Exercises + Reasoning */}
+          {isAISuggested && aiSuggestedExercises.length > 0 && !aiLoading && (
+            <div className="py-4">
+              {/* Overall Reasoning - minimal styling */}
+              {aiOverallReasoning && (
+                <div className="mb-4">
+                  <div className="text-[12px] leading-[140%] text-[rgba(0,0,0,0.5)] mb-1">
+                    today
+                  </div>
+                  <div className="text-[14px] leading-[140%] text-[#000000]">
+                    {aiOverallReasoning}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           
@@ -860,20 +956,25 @@ export default function StartWorkout() {
             </div>
           ) : activePresetData.exercises.length === 0 ? (
             <>
-              <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
-                No exercises in this template yet.
-              </div>
-              
-              {/* Кнопка добавления упражнения */}
-              <button
-                onClick={loadAvailableExercises}
-                disabled={loadingExercises}
-                className="flex items-center justify-between py-5 border-b border-[rgba(0,0,0,0.1)] bg-[#ffffff] w-full text-left hover:bg-[#f7f7f7] transition-colors disabled:opacity-50"
-              >
-                <span className="text-[20px] leading-[120%] text-[rgba(0,0,0,0.5)]">
-                  {loadingExercises ? "Loading..." : "+ add exercise"}
-                </span>
-              </button>
+              {/* Don't show empty state for AI suggested before generation */}
+              {!isAISuggested && (
+                <>
+                  <div className="py-12 text-center text-[16px] leading-[140%] text-[rgba(0,0,0,0.4)]">
+                    No exercises in this template yet.
+                  </div>
+                  
+                  {/* Кнопка добавления упражнения */}
+                  <button
+                    onClick={loadAvailableExercises}
+                    disabled={loadingExercises}
+                    className="flex items-center justify-between py-5 border-b border-[rgba(0,0,0,0.1)] bg-[#ffffff] w-full text-left hover:bg-[#f7f7f7] transition-colors disabled:opacity-50"
+                  >
+                    <span className="text-[20px] leading-[120%] text-[rgba(0,0,0,0.5)]">
+                      {loadingExercises ? "Loading..." : "+ add exercise"}
+                    </span>
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <>
@@ -947,20 +1048,23 @@ export default function StartWorkout() {
                 )
               })}
               
-              {/* Кнопка добавления упражнения */}
-              <button
-                onClick={loadAvailableExercises}
-                disabled={loadingExercises}
-                className="flex items-center justify-between py-5 border-b border-[rgba(0,0,0,0.1)] bg-[#ffffff] w-full text-left hover:bg-[#f7f7f7] transition-colors disabled:opacity-50"
-              >
-                <span className="text-[20px] leading-[120%] text-[rgba(0,0,0,0.5)]">
-                  {loadingExercises ? "Loading..." : "+ add exercise"}
-                </span>
-              </button>
+              {/* Кнопка добавления упражнения - show after AI generation */}
+              {(!isAISuggested || (isAISuggested && aiSuggestedExercises.length > 0)) && (
+                <button
+                  onClick={loadAvailableExercises}
+                  disabled={loadingExercises}
+                  className="flex items-center justify-between py-5 border-b border-[rgba(0,0,0,0.1)] bg-[#ffffff] w-full text-left hover:bg-[#f7f7f7] transition-colors disabled:opacity-50"
+                >
+                  <span className="text-[20px] leading-[120%] text-[rgba(0,0,0,0.5)]">
+                    {loadingExercises ? "Loading..." : "+ add exercise"}
+                  </span>
+                </button>
+              )}
             </>
           )}
         </div>
 
+        {/* Fixed Bottom Button Area */}
         <div className="fixed bottom-[10px] left-0 right-0 flex justify-center pointer-events-none z-50">
           <div className="w-full max-w-md px-[10px] pointer-events-auto">
             <div
@@ -974,9 +1078,76 @@ export default function StartWorkout() {
             />
 
             <div className="space-y-3">
-              <button
-                onClick={() => {
-                  if (isStartDisabled) return
+              {/* AI Input + Generate Button (shown when no workout generated yet) */}
+              {isAISuggested && aiSuggestedExercises.length === 0 && !aiLoading && (
+                <>
+                  {/* User Preferences Link above input, aligned right */}
+                  <div className="flex justify-end mb-2">
+                    <button
+                      onClick={() => setShowPreferencesModal(true)}
+                      className="text-[14px] leading-[140%] text-[rgba(0,0,0,0.6)] underline hover:text-[#000000] transition-colors"
+                    >
+                      edit preferences
+                    </button>
+                  </div>
+                  
+                  {/* Local Context Input */}
+                  <textarea
+                    value={aiLocalContext}
+                    onChange={(e) => setAiLocalContext(e.target.value)}
+                    placeholder="tell me how you're feeling today, what's coming up, or any context i should know - and i'll help you plan your workout"
+                    className="w-full min-h-[160px] px-4 py-3 bg-[#f7f7f7] rounded-[20px] text-[16px] leading-[140%] text-[#000000] placeholder:text-[rgba(0,0,0,0.3)] outline-none resize-none"
+                  />
+                  
+                  <button
+                    onClick={handleGenerateWorkout}
+                    disabled={aiLoading}
+                    className="w-full text-[#000000] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90 transition-opacity disabled:opacity-40"
+                    style={{
+                      background: 'linear-gradient(135deg, #ff0080 0%, #ff0000 10%, #ff8c00 20%, #ffd700 30%, #00ff00 40%, #00ffff 50%, #0080ff 60%, #8000ff 70%, #ff00ff 80%, #ff0080 90%, #ff0000 100%)',
+                      backgroundSize: '300% 300%',
+                    }}
+                  >
+                    generate workout
+                  </button>
+                </>
+              )}
+              
+              {/* Adjust Workout Input (shown after AI generation, above Start button) */}
+              {isAISuggested && aiSuggestedExercises.length > 0 && (
+                <div className="relative w-full">
+                  <input
+                    type="text"
+                    value={aiAdjustmentContext}
+                    onChange={(e) => setAiAdjustmentContext(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && aiAdjustmentContext.trim()) {
+                        handleGenerateWorkout(aiAdjustmentContext)
+                      }
+                    }}
+                    placeholder="type to adjust your workout"
+                    className="w-full bg-[#ffffff] text-[#000000] py-4 pl-4 pr-12 rounded-[60px] text-[16px] leading-[120%] font-normal border-2 border-[#000000] outline-none focus:bg-[#f7f7f7] transition-colors placeholder:text-[rgba(0,0,0,0.3)]"
+                  />
+                  <button
+                    onClick={() => {
+                      if (aiAdjustmentContext.trim()) {
+                        handleGenerateWorkout(aiAdjustmentContext)
+                      }
+                    }}
+                    disabled={!aiAdjustmentContext.trim()}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[rgba(0,0,0,0.3)] hover:text-[#000000] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Adjust workout"
+                  >
+                    <Mic className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+              
+              {/* Start Button (hidden when AI not generated yet) */}
+              {(!isAISuggested || aiSuggestedExercises.length > 0) && (
+                <button
+                  onClick={() => {
+                    if (isStartDisabled) return
                   
                   // Генерируем уникальный ID для тренировки (timestamp + random)
                   const workoutId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -1015,13 +1186,14 @@ export default function StartWorkout() {
                   // Переходим на страницу тренировки с уникальным ID
                   window.location.href = `/workout/${workoutId}`
                 }}
-                disabled={isStartDisabled}
-                className={`w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal transition-opacity ${
-                  isStartDisabled ? "opacity-40 cursor-not-allowed" : "hover:opacity-90"
-                }`}
-              >
-                start
-              </button>
+                  disabled={isStartDisabled}
+                  className={`w-full bg-[#000000] text-[#ffffff] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal transition-opacity ${
+                    isStartDisabled ? "opacity-40 cursor-not-allowed" : "hover:opacity-90"
+                  }`}
+                >
+                  start
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1141,6 +1313,53 @@ export default function StartWorkout() {
                     className="flex-1 px-6 py-3 bg-[#000000] text-[#ffffff] rounded-[60px] text-[16px] leading-[120%] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {creatingSet ? "creating..." : "create"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+        
+        {/* Модальное окно редактирования preferences */}
+        {showPreferencesModal && (
+          <>
+            <div 
+              className="fixed inset-0 bg-[rgba(0,0,0,0.3)] z-[60]" 
+              onClick={() => setShowPreferencesModal(false)} 
+            />
+            <div className="fixed bottom-0 left-0 right-0 z-[70] bg-[#ffffff] rounded-t-[30px] shadow-2xl animate-slide-up max-h-[80vh] flex flex-col">
+              <div className="w-full max-w-md mx-auto p-6 flex-1 flex flex-col">
+                <h2 className="text-[24px] leading-[120%] font-normal text-[#000000] mb-2">
+                  training preferences
+                </h2>
+                
+                <p className="text-[14px] leading-[140%] text-[rgba(0,0,0,0.6)] mb-6">
+                  describe your permanent training preferences, goals, limitations, or any context the ai should always consider
+                </p>
+                
+                <div className="mb-6 flex-1">
+                  <textarea
+                    value={userPreferences}
+                    onChange={(e) => setUserPreferences(e.target.value)}
+                    placeholder="e.g. focus on strength training, avoid exercises with heavy shoulder load due to past injury, prefer compound movements..."
+                    className="w-full min-h-[200px] bg-[#f7f7f7] rounded-[12px] px-4 py-3 text-[16px] leading-[140%] text-[#000000] placeholder:text-[rgba(0,0,0,0.3)] outline-none focus:ring-2 focus:ring-[#000000] resize-none"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowPreferencesModal(false)}
+                    className="flex-1 px-6 py-3 bg-[#f7f7f7] text-[#000000] rounded-[60px] text-[16px] leading-[120%] hover:bg-[#e0e0e0] transition-colors"
+                  >
+                    cancel
+                  </button>
+                  <button
+                    onClick={handleSavePreferences}
+                    disabled={savingPreferences}
+                    className="flex-1 px-6 py-3 bg-[#000000] text-[#ffffff] rounded-[60px] text-[16px] leading-[120%] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {savingPreferences ? "saving..." : "save"}
                   </button>
                 </div>
               </div>
