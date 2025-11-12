@@ -3,8 +3,9 @@
  * Генерируем заново только если была новая тренировка
  */
 
-import type { SuggestedWorkout, WorkoutHistoryEntry } from './types'
-import { generateAISuggestedWorkout, type DbExercise } from './generator'
+import type { SuggestedWorkout, LegacyWorkoutHistoryEntry } from './types'
+import { generateAISuggestedWorkout } from './generator'
+import type { DbExercise } from './prompt-builder'
 
 const CACHE_KEY = 'ai-suggested-workout-cache'
 
@@ -17,7 +18,7 @@ interface CachedWorkout {
  * Главная функция получения AI Suggested Workout с кешированием
  */
 export function getAISuggestedWorkout(
-  workoutHistory: WorkoutHistoryEntry[],
+  workoutHistory: LegacyWorkoutHistoryEntry[],
   exercisesFromDB: DbExercise[]
 ): SuggestedWorkout {
   // Создаем хеш из ID последних 5 тренировок

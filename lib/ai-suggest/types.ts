@@ -44,7 +44,7 @@ export interface ExerciseMetadata {
   difficulty: 'beginner' | 'intermediate' | 'advanced'
 }
 
-export interface WorkoutHistoryEntry {
+export interface LegacyWorkoutHistoryEntry {
   id: string
   date: Date
   exercises: {

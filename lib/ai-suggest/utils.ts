@@ -2,7 +2,7 @@
  * Вспомогательные функции для AI Suggested
  */
 
-import type { MuscleGroup, WorkoutHistoryEntry } from './types'
+import type { MuscleGroup, LegacyWorkoutHistoryEntry } from './types'
 
 /**
  * Определить мышечные группы на основе метаданных упражнения из БД
@@ -55,7 +55,7 @@ export function getMuscleGroupsFromExercise(exercise: {
  */
 export function mapSupabaseToAIHistory(
   supabaseData: any[]
-): WorkoutHistoryEntry[] {
+): LegacyWorkoutHistoryEntry[] {
   return supabaseData.map(session => ({
     id: session.id,
     date: new Date(session.started_at),

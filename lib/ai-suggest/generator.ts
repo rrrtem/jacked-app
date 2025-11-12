@@ -4,22 +4,14 @@
  */
 
 import type {
-  WorkoutHistoryEntry,
+  LegacyWorkoutHistoryEntry,
   SuggestedWorkout,
   SuggestedExercise,
   MuscleGroup,
   WorkoutType,
   RecoveryStatus,
 } from './types'
-
-// Упражнение из БД
-export type DbExercise = {
-  id: string
-  name: string
-  exercise_type: string
-  movement_pattern: string
-  muscle_group: string
-}
+import type { DbExercise } from './prompt-builder'
 
 // Время восстановления для каждой группы мышц (в днях)
 const RECOVERY_TIMES: Record<MuscleGroup, number> = {
@@ -45,7 +37,7 @@ const BIG_FIVE_NAMES = [
  * Главная функция генерации тренировки
  */
 export function generateAISuggestedWorkout(
-  workoutHistory: WorkoutHistoryEntry[],
+  workoutHistory: LegacyWorkoutHistoryEntry[],
   exercisesFromDB: DbExercise[]
 ): SuggestedWorkout {
   // 1. Анализируем историю
@@ -73,7 +65,7 @@ export function generateAISuggestedWorkout(
 /**
  * Анализ восстановления мышечных групп
  */
-function analyzeRecovery(history: WorkoutHistoryEntry[]): RecoveryStatus[] {
+function analyzeRecovery(history: LegacyWorkoutHistoryEntry[]): RecoveryStatus[] {
   const today = new Date()
   const statuses: RecoveryStatus[] = []
   
@@ -111,7 +103,7 @@ function analyzeRecovery(history: WorkoutHistoryEntry[]): RecoveryStatus[] {
  * Определяем тип тренировки на основе истории и восстановления
  */
 function determineWorkoutType(
-  history: WorkoutHistoryEntry[],
+  history: LegacyWorkoutHistoryEntry[],
   recovery: RecoveryStatus[],
   exercisesFromDB: DbExercise[]
 ): WorkoutType {
@@ -378,8 +370,8 @@ function createSuggestedExercise(
 
 function findLastWorkoutForMuscle(
   muscle: MuscleGroup,
-  history: WorkoutHistoryEntry[]
-): WorkoutHistoryEntry | null {
+  history: LegacyWorkoutHistoryEntry[]
+): LegacyWorkoutHistoryEntry | null {
   for (const workout of history) {
     const hasMuscle = workout.exercises.some(ex =>
       ex.primaryMuscles.includes(muscle)
@@ -392,7 +384,7 @@ function findLastWorkoutForMuscle(
 }
 
 function getRecentExerciseIds(
-  history: WorkoutHistoryEntry[],
+  history: LegacyWorkoutHistoryEntry[],
   numWorkouts: number
 ): string[] {
   const recent = history.slice(0, numWorkouts)

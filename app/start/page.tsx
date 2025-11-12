@@ -1100,7 +1100,7 @@ export default function StartWorkout() {
                   />
                   
                   <button
-                    onClick={handleGenerateWorkout}
+                    onClick={() => handleGenerateWorkout()}
                     disabled={aiLoading}
                     className="w-full text-[#000000] py-5 rounded-[60px] text-[20px] leading-[120%] font-normal hover:opacity-90 transition-opacity disabled:opacity-40"
                     style={{
