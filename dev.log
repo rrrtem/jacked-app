@@ -581,3 +581,4 @@ https://nextjs.org/docs/messages/module-not-found
 
  ✓ Compiled in 25ms
  GET / 200 in 271ms (compile: 5ms, proxy.ts: 243ms, render: 22ms)
+ GET /login 200 in 1433ms (compile: 93ms, proxy.ts: 1160ms, render: 180ms)
